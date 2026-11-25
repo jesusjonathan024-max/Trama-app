@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
   Pause,
   Play,
   RotateCcw,
@@ -11,10 +14,12 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import {
   formatDifficultyLabel,
   getArcadeHighScores,
   saveArcadeHighScore,
+  submitGlobalArcadeScore,
   type ArcadeGameConfig,
 } from '../lib/arcade';
 
@@ -302,10 +307,15 @@ export function ArcadeGameModal({
   onClose,
   onHighScoreUpdated,
 }: ArcadeGameModalProps) {
+  const { user } = useAuth();
   const [phase, setPhase] = useState<GamePhase>('TITLE_MENU');
   const [muted, setMuted] = useState(false);
   const [bestScore, setBestScore] = useState(0);
   const [isNewRecord, setIsNewRecord] = useState(false);
+  const [globalScoreStatus, setGlobalScoreStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'not_higher' | 'guest' | 'error'
+  >('idle');
+  const [globalScoreNote, setGlobalScoreNote] = useState<string | null>(null);
   const [runKey, setRunKey] = useState(0);
   const [hud, setHud] = useState<HudSnapshot>({
     score: 0,
@@ -321,6 +331,8 @@ export function ArcadeGameModal({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const phaseRef = useRef<GamePhase>('TITLE_MENU');
   const synthRef = useRef<RetroSynth>(new RetroSynth());
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
 
   // Entrada de teclado en 8 direcciones (X y Y)
   const keysRef = useRef<{
@@ -361,6 +373,8 @@ export function ArcadeGameModal({
     setBestScore(scores[game.id] ?? 0);
     setPhase('TITLE_MENU');
     setIsNewRecord(false);
+    setGlobalScoreStatus('idle');
+    setGlobalScoreNote(null);
     setHud({
       score: 0,
       lives: 3,
@@ -377,6 +391,8 @@ export function ArcadeGameModal({
     pointerStateRef.current.pendingDx = 0;
     pointerStateRef.current.pendingDy = 0;
     setIsNewRecord(false);
+    setGlobalScoreStatus('idle');
+    setGlobalScoreNote(null);
     setPhase('PLAYING');
     setRunKey((prev) => prev + 1);
     synthRef.current.ability();
@@ -638,6 +654,40 @@ export function ArcadeGameModal({
         syncHud();
         synth.gameOver();
         setPhase('GAME_OVER');
+
+        const activeUserId = userIdRef.current;
+        if (!activeUserId) {
+          setGlobalScoreStatus('guest');
+          setGlobalScoreNote(null);
+        } else if (finalScore > 0) {
+          setGlobalScoreStatus('saving');
+          setGlobalScoreNote(null);
+          void submitGlobalArcadeScore({
+            userId: activeUserId,
+            gameId: game.id,
+            score: finalScore,
+          })
+            .then((result) => {
+              if (result.saved) {
+                setGlobalScoreStatus('saved');
+                setGlobalScoreNote(null);
+                onHighScoreUpdated();
+              } else {
+                setGlobalScoreStatus('not_higher');
+                setGlobalScoreNote(
+                  `Tu mejor récord global es ${result.bestScore.toLocaleString('es-ES')} pts.`
+                );
+              }
+            })
+            .catch((err: unknown) => {
+              setGlobalScoreStatus('error');
+              setGlobalScoreNote(
+                err instanceof Error
+                  ? err.message
+                  : 'No se pudo guardar en el Top 10 Global.'
+              );
+            });
+        }
       }
     };
 
@@ -1870,6 +1920,37 @@ export function ArcadeGameModal({
                   </p>
                 </div>
               </div>
+
+              {globalScoreStatus === 'saving' && (
+                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs text-[#9AA4B6]">
+                  <Loader2 size={13} className="animate-spin text-[#7FB2FF]" aria-hidden="true" />
+                  <span>Sincronizando con el Top 10 Global…</span>
+                </p>
+              )}
+
+              {globalScoreStatus === 'saved' && (
+                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                  <span>¡Nuevo récord guardado en el Top 10 Global!</span>
+                </p>
+              )}
+
+              {globalScoreStatus === 'not_higher' && globalScoreNote && (
+                <p className="mt-3.5 text-xs text-[#8F99AB]">{globalScoreNote}</p>
+              )}
+
+              {globalScoreStatus === 'guest' && (
+                <p className="mt-3.5 text-xs text-[#8F99AB]">
+                  Inicia sesión para registrar tu puntaje en el Top 10 Global.
+                </p>
+              )}
+
+              {globalScoreStatus === 'error' && globalScoreNote && (
+                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs text-red-300">
+                  <AlertCircle size={13} className="shrink-0" aria-hidden="true" />
+                  <span>{globalScoreNote}</span>
+                </p>
+              )}
 
               <div className="mt-6 flex w-full max-w-xs flex-col gap-2.5">
                 <button

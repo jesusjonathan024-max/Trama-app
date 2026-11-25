@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Loader2,
   Play,
+  RefreshCw,
   Sparkles,
   Star,
   Trash2,
@@ -17,7 +18,9 @@ import { useAuth } from '../context/AuthContext';
 import { generateAiArcadeChallenge } from '../lib/ai';
 import {
   addCustomArcadeChallenge,
+  deleteArcadeScore,
   deleteCustomArcadeChallenge,
+  fetchArcadeLeaderboard,
   formatDifficultyLabel,
   getArcadeHighScores,
   loadArcadeGames,
@@ -25,8 +28,11 @@ import {
   toggleHiddenArcadeGame,
   type ArcadeEngineId,
   type ArcadeGameConfig,
+  type ArcadeLeaderboardEntry,
 } from '../lib/arcade';
 import { ArcadeGameModal } from './ArcadeGameModal';
+import { Avatar } from './Avatar';
+import { OwnerBadge } from './OwnerBadge';
 
 function GamePreviewArtwork({ game }: { game: ArcadeGameConfig }) {
   const { bg, primary, accent, danger } = game.palette;
@@ -117,12 +123,25 @@ function GamePreviewArtwork({ game }: { game: ArcadeGameConfig }) {
 }
 
 export function ArcadeSection() {
-  const { isOwner } = useAuth();
+  const { user, isOwner } = useAuth();
   const [games, setGames] = useState<ArcadeGameConfig[]>(() => loadArcadeGames());
   const [highScores, setHighScores] = useState<Record<string, number>>(() =>
     getArcadeHighScores()
   );
   const [activeGame, setActiveGame] = useState<ArcadeGameConfig | null>(null);
+
+  // Top 10 Global (public.arcade_scores + profiles)
+  const [selectedBoardGameId, setSelectedBoardGameId] = useState<string>(
+    () => loadArcadeGames()[0]?.id ?? 'senda-astral'
+  );
+  const [leaderboard, setLeaderboard] = useState<ArcadeLeaderboardEntry[]>([]);
+  const [isLoadingBoard, setIsLoadingBoard] = useState(true);
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
+  const [confirmDeleteScoreId, setConfirmDeleteScoreId] = useState<string | null>(
+    null
+  );
+  const [deletingScoreId, setDeletingScoreId] = useState<string | null>(null);
 
   // Modal exclusivo del Dueño: crear desafío retro-fantasía con Gemini gratuito
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
@@ -133,6 +152,7 @@ export function ArcadeSection() {
 
   const refreshHighScores = useCallback(() => {
     setHighScores(getArcadeHighScores());
+    setBoardRefreshKey((prev) => prev + 1);
   }, []);
 
   useEffect(() => {
@@ -145,6 +165,66 @@ export function ArcadeSection() {
   const catalogGames = featuredGame
     ? visibleGames.filter((g) => g.id !== featuredGame.id)
     : visibleGames;
+
+  useEffect(() => {
+    if (
+      visibleGames.length > 0 &&
+      !visibleGames.some((g) => g.id === selectedBoardGameId)
+    ) {
+      setSelectedBoardGameId(visibleGames[0].id);
+    }
+  }, [visibleGames, selectedBoardGameId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBoard() {
+      if (!selectedBoardGameId) return;
+      setIsLoadingBoard(true);
+      setBoardError(null);
+      setConfirmDeleteScoreId(null);
+      try {
+        const entries = await fetchArcadeLeaderboard(selectedBoardGameId, 10);
+        if (active) {
+          setLeaderboard(entries);
+        }
+      } catch (err) {
+        if (active) {
+          setBoardError(
+            err instanceof Error
+              ? err.message
+              : 'No se pudo cargar el Top 10 Global.'
+          );
+        }
+      } finally {
+        if (active) {
+          setIsLoadingBoard(false);
+        }
+      }
+    }
+    void loadBoard();
+    return () => {
+      active = false;
+    };
+  }, [selectedBoardGameId, boardRefreshKey]);
+
+  async function handleDeleteScore(scoreId: string) {
+    if (!isOwner || deletingScoreId) return;
+    setDeletingScoreId(scoreId);
+    setBoardError(null);
+    try {
+      await deleteArcadeScore(scoreId);
+      setLeaderboard((prev) => prev.filter((item) => item.id !== scoreId));
+      setConfirmDeleteScoreId(null);
+    } catch (err) {
+      setBoardError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo eliminar el puntaje del marcador.'
+      );
+    } finally {
+      setDeletingScoreId(null);
+    }
+  }
 
   function handleToggleFeatured(gameId: string) {
     if (!isOwner) return;
@@ -446,6 +526,212 @@ export function ArcadeSection() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Tabla de Récords: Top 10 Global */}
+      <div
+        aria-labelledby="arcade-leaderboard-heading"
+        className="mt-10 rounded-2xl border border-white/[0.08] bg-[#11151D] p-5 sm:p-6"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.07] pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/12 text-amber-300">
+              <Trophy size={18} aria-hidden="true" />
+            </div>
+            <div>
+              <h2
+                id="arcade-leaderboard-heading"
+                className="font-display text-xl font-bold tracking-tight text-white"
+              >
+                Top 10 Global
+              </h2>
+              <p className="text-xs text-[#8F99AB]">
+                Mejores puntajes verificados de la comunidad de Trama.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setBoardRefreshKey((prev) => prev + 1)}
+            disabled={isLoadingBoard}
+            aria-label="Actualizar tabla de récords"
+            className="min-h-[40px] self-start sm:self-auto inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#171C27] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw
+              size={14}
+              className={isLoadingBoard ? 'animate-spin' : ''}
+              aria-hidden="true"
+            />
+            <span>Actualizar</span>
+          </button>
+        </div>
+
+        {/* Filtro por minijuego */}
+        {visibleGames.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Filtrar Top 10 por juego"
+            className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {visibleGames.map((game) => {
+              const isSelected = selectedBoardGameId === game.id;
+              return (
+                <button
+                  key={game.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setSelectedBoardGameId(game.id)}
+                  className={`min-h-[40px] shrink-0 rounded-xl border px-3.5 text-xs font-semibold transition-colors ${
+                    isSelected
+                      ? 'border-[#388BFF]/60 bg-[#388BFF]/15 text-white'
+                      : 'border-white/[0.08] bg-[#0B0E14] text-[#9AA4B6] hover:border-white/[0.16] hover:text-white'
+                  }`}
+                >
+                  {game.title}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {boardError && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200"
+          >
+            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
+            <span>{boardError}</span>
+          </div>
+        )}
+
+        <div className="mt-4">
+          {isLoadingBoard ? (
+            <div className="space-y-2 animate-pulse">
+              <div className="h-14 rounded-xl bg-[#0B0E14]" />
+              <div className="h-14 rounded-xl bg-[#0B0E14]" />
+              <div className="h-14 rounded-xl bg-[#0B0E14]" />
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="rounded-xl border border-white/[0.06] bg-[#0B0E14] px-4 py-8 text-center">
+              <Trophy size={24} className="mx-auto text-[#637086]" aria-hidden="true" />
+              <p className="mt-2.5 text-sm font-medium text-[#CBD5E1]">
+                Aún no hay récords registrados en este minijuego
+              </p>
+              <p className="mt-1 text-xs text-[#838FA4]">
+                Inicia una partida con tu cuenta para reclamar el puesto #1.
+              </p>
+            </div>
+          ) : (
+            <ol className="space-y-2">
+              {leaderboard.map((entry, idx) => {
+                const rank = idx + 1;
+                const isCurrentUser = user?.id === entry.user_id;
+                const playerName =
+                  entry.player.username?.trim() || 'Jugador de Trama';
+                const isConfirming = confirmDeleteScoreId === entry.id;
+                const isDeleting = deletingScoreId === entry.id;
+
+                const rankClasses =
+                  rank === 1
+                    ? 'border-amber-400/50 bg-amber-400/18 text-amber-200'
+                    : rank === 2
+                      ? 'border-slate-300/35 bg-slate-300/12 text-slate-200'
+                      : rank === 3
+                        ? 'border-orange-400/40 bg-orange-400/14 text-orange-200'
+                        : 'border-white/[0.08] bg-[#141925] text-[#8F99AB]';
+
+                return (
+                  <li
+                    key={entry.id}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition-colors ${
+                      isCurrentUser
+                        ? 'border-[#388BFF]/40 bg-[#388BFF]/[0.08]'
+                        : 'border-white/[0.06] bg-[#0B0E14]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-bold tabular-nums ${rankClasses}`}
+                      >
+                        #{rank}
+                      </span>
+
+                      <Avatar
+                        src={entry.player.avatar_url}
+                        name={playerName}
+                        size="sm"
+                      />
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold text-white">
+                            {playerName}
+                          </span>
+                          {isCurrentUser && (
+                            <span className="text-[11px] font-medium text-[#7FB2FF]">
+                              (Tú)
+                            </span>
+                          )}
+                          <OwnerBadge
+                            role={entry.player.role}
+                            badge={entry.player.badge}
+                            size="xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="text-right">
+                        <span className="font-display text-base font-bold tabular-nums text-white">
+                          {entry.score.toLocaleString('es-ES')}
+                        </span>
+                        <span className="ml-1 text-[11px] text-[#7D879A]">
+                          pts
+                        </span>
+                      </div>
+
+                      {isOwner && (
+                        isConfirming ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => void handleDeleteScore(entry.id)}
+                              className="min-h-[34px] rounded-lg bg-red-500/90 px-2.5 text-[11px] font-semibold text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
+                            >
+                              {isDeleting ? 'Borrando…' : 'Confirmar'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => setConfirmDeleteScoreId(null)}
+                              className="min-h-[34px] rounded-lg border border-white/[0.1] px-2 text-[11px] text-[#9AA4B6] hover:text-white transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteScoreId(entry.id)}
+                            title="Reiniciar / borrar puntaje sospechoso"
+                            aria-label={`Borrar puntaje de ${playerName}`}
+                            className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl border border-white/[0.08] text-[#8F99AB] hover:border-red-500/35 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
       </div>
 
       {/* Modal de juego HTML5 Canvas */}

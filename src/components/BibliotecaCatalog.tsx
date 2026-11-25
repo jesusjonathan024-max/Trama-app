@@ -342,7 +342,11 @@ export function BibliotecaCatalog({
                         <span className="truncate max-w-[110px]">
                           {getAuthorDisplayName(series.author)}
                         </span>
-                        <OwnerBadge role={series.author.role} size="xs" />
+                        <OwnerBadge
+                          role={series.author.role}
+                          badge={series.author.badge}
+                          size="xs"
+                        />
                       </>
                     )}
                   </div>

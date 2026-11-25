@@ -472,7 +472,11 @@ export function ActualidadFeed({
                   <span className="truncate text-xs font-medium text-[#D8DEE9] max-w-[140px]">
                     {getAuthorDisplayName(leadArticle.author)}
                   </span>
-                  <OwnerBadge role={leadArticle.author?.role} size="xs" />
+                  <OwnerBadge
+                    role={leadArticle.author?.role}
+                    badge={leadArticle.author?.badge}
+                    size="xs"
+                  />
                 </div>
 
                 <div className="flex items-center gap-0.5">
@@ -657,7 +661,11 @@ export function ActualidadFeed({
                             <span className="truncate text-xs font-medium text-[#D2D9E5] max-w-[160px]">
                               {getAuthorDisplayName(article.author)}
                             </span>
-                            <OwnerBadge role={article.author?.role} size="xs" />
+                            <OwnerBadge
+                              role={article.author?.role}
+                              badge={article.author?.badge}
+                              size="xs"
+                            />
                           </div>
 
                           <div className="flex items-center gap-0.5">

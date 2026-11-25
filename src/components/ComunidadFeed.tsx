@@ -409,7 +409,11 @@ export function ComunidadFeed({
                       <span className="text-sm font-semibold text-white truncate max-w-[160px]">
                         {authorName}
                       </span>
-                      <OwnerBadge role={thread.author?.role} size="xs" />
+                      <OwnerBadge
+                        role={thread.author?.role}
+                        badge={thread.author?.badge}
+                        size="xs"
+                      />
                       <span aria-hidden="true" className="text-[#566072]">
                         ·
                       </span>

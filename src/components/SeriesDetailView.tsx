@@ -298,7 +298,11 @@ export function SeriesDetailView({
               <span className="text-sm font-medium text-[#D5DCE6]">
                 {authorName}
               </span>
-              <OwnerBadge role={series.author?.role} size="sm" />
+              <OwnerBadge
+                role={series.author?.role}
+                badge={series.author?.badge}
+                size="sm"
+              />
             </div>
 
             <div className="mt-5">

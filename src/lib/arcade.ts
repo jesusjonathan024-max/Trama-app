@@ -1,4 +1,5 @@
 import type { AiArcadeChallenge } from './ai';
+import { supabase } from './supabase';
 
 export type ArcadeEngineId = 'astral' | 'bastion';
 export type ArcadeDifficulty = 'normal' | 'dificil' | 'extremo';
@@ -256,4 +257,206 @@ export function formatDifficultyLabel(diff: ArcadeDifficulty): string {
   if (diff === 'extremo') return 'Extremo';
   if (diff === 'dificil') return 'Difícil';
   return 'Normal';
+}
+
+export interface ArcadeLeaderboardPlayer {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  role: string | null;
+  badge: string | null;
+}
+
+export interface ArcadeLeaderboardEntry {
+  id: string;
+  user_id: string;
+  game_id: string;
+  score: number;
+  updated_at: string;
+  player: ArcadeLeaderboardPlayer;
+}
+
+export interface GlobalScoreSubmitResult {
+  saved: boolean;
+  previousBest: number;
+  bestScore: number;
+}
+
+interface RawArcadeScoreRow {
+  id: string;
+  user_id: string;
+  game_id: string;
+  score: number;
+  updated_at: string;
+}
+
+interface RawProfileLookupRow {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  role: string | null;
+  badge: string | null;
+}
+
+export async function submitGlobalArcadeScore(params: {
+  userId: string;
+  gameId: string;
+  score: number;
+}): Promise<GlobalScoreSubmitResult> {
+  const cleanScore = Math.max(0, Math.floor(params.score));
+  if (!params.userId || !params.gameId || cleanScore <= 0) {
+    return { saved: false, previousBest: 0, bestScore: 0 };
+  }
+
+  const { data: existingRows, error: lookupError } = await supabase
+    .from('arcade_scores')
+    .select('id, score')
+    .eq('user_id', params.userId)
+    .eq('game_id', params.gameId)
+    .order('score', { ascending: false })
+    .limit(1);
+
+  if (lookupError) {
+    throw new Error(lookupError.message);
+  }
+
+  const existing = existingRows?.[0] as { id: string; score: number } | undefined;
+  const previousBest = existing ? Math.max(0, Number(existing.score) || 0) : 0;
+
+  if (cleanScore <= previousBest) {
+    return {
+      saved: false,
+      previousBest,
+      bestScore: previousBest,
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+
+  const { error: upsertError } = await supabase.from('arcade_scores').upsert(
+    {
+      user_id: params.userId,
+      game_id: params.gameId,
+      score: cleanScore,
+      updated_at: nowIso,
+    },
+    { onConflict: 'user_id,game_id' }
+  );
+
+  if (upsertError) {
+    // Si la tabla no tiene índice único compuesto (user_id, game_id), actualizar o insertar manualmente
+    if (upsertError.code === '42P10' || upsertError.message.includes('ON CONFLICT')) {
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from('arcade_scores')
+          .update({ score: cleanScore, updated_at: nowIso })
+          .eq('id', existing.id);
+        if (updateError) throw new Error(updateError.message);
+      } else {
+        const { error: insertError } = await supabase
+          .from('arcade_scores')
+          .insert({
+            user_id: params.userId,
+            game_id: params.gameId,
+            score: cleanScore,
+            updated_at: nowIso,
+          });
+        if (insertError) throw new Error(insertError.message);
+      }
+    } else {
+      throw new Error(upsertError.message);
+    }
+  }
+
+  return {
+    saved: true,
+    previousBest,
+    bestScore: cleanScore,
+  };
+}
+
+export async function fetchArcadeLeaderboard(
+  gameId: string,
+  limit = 10
+): Promise<ArcadeLeaderboardEntry[]> {
+  if (!gameId) return [];
+
+  const { data: scoreRows, error: scoresError } = await supabase
+    .from('arcade_scores')
+    .select('id, user_id, game_id, score, updated_at')
+    .eq('game_id', gameId)
+    .order('score', { ascending: false })
+    .order('updated_at', { ascending: true })
+    .limit(Math.max(limit * 3, 30));
+
+  if (scoresError) {
+    throw new Error(scoresError.message);
+  }
+
+  const rawRows = (scoreRows ?? []) as RawArcadeScoreRow[];
+  if (rawRows.length === 0) return [];
+
+  // Deduplicar conservando el puntaje más alto por usuario
+  const seenUsers = new Set<string>();
+  const topRows: RawArcadeScoreRow[] = [];
+  for (const row of rawRows) {
+    if (!row.user_id || seenUsers.has(row.user_id)) continue;
+    seenUsers.add(row.user_id);
+    topRows.push(row);
+    if (topRows.length >= limit) break;
+  }
+
+  const userIds = topRows.map((r) => r.user_id);
+  const { data: profileRows, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url, role, badge')
+    .in('id', userIds);
+
+  if (profilesError) {
+    throw new Error(profilesError.message);
+  }
+
+  const profileMap = new Map<string, ArcadeLeaderboardPlayer>();
+  for (const prof of (profileRows ?? []) as RawProfileLookupRow[]) {
+    profileMap.set(prof.id, {
+      id: prof.id,
+      username: prof.username ?? null,
+      avatar_url: prof.avatar_url ?? null,
+      role: prof.role ?? null,
+      badge: prof.badge ?? null,
+    });
+  }
+
+  return topRows.map((row) => ({
+    id: String(row.id),
+    user_id: row.user_id,
+    game_id: row.game_id,
+    score: Math.max(0, Number(row.score) || 0),
+    updated_at: row.updated_at,
+    player: profileMap.get(row.user_id) ?? {
+      id: row.user_id,
+      username: null,
+      avatar_url: null,
+      role: null,
+      badge: null,
+    },
+  }));
+}
+
+export async function deleteArcadeScore(scoreId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('arcade_scores')
+    .delete()
+    .eq('id', scoreId)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      'No se pudo eliminar el puntaje. Verifica que la política RLS de DELETE en arcade_scores permita al Dueño borrar registros ajenos.'
+    );
+  }
 }

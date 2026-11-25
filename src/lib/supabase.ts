@@ -22,12 +22,21 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   },
 });
 
+export const MEMBER_BADGE_OPTIONS = [
+  'Fundador',
+  'Autor Verificado',
+  'Moderador',
+] as const;
+
+export type MemberBadge = (typeof MEMBER_BADGE_OPTIONS)[number];
+
 export interface UserProfile {
   id: string;
   username: string | null;
   bio: string | null;
   avatar_url: string | null;
   role: string | null;
+  badge: string | null;
 }
 
 export function isOwnerRole(role: string | null | undefined): boolean {

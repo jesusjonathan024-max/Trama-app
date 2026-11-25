@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, bio, avatar_url, role')
+        .select('id, username, bio, avatar_url, role, badge')
         .eq('id', userId)
         .maybeSingle();
 
@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           bio: null,
           avatar_url: null,
           role: null,
+          badge: null,
         });
         setProfileExists(false);
         return;
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           bio: data.bio ?? null,
           avatar_url: data.avatar_url ?? null,
           role: data.role ?? null,
+          badge: data.badge ?? null,
         });
         setProfileExists(true);
       } else {
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           bio: null,
           avatar_url: null,
           role: null,
+          badge: null,
         });
         setProfileExists(false);
       }
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         bio: null,
         avatar_url: null,
         role: null,
+        badge: null,
       });
       setProfileExists(false);
     } finally {

@@ -127,7 +127,11 @@ function CommentItem({
               <span className="font-semibold text-[#E8ECF4] truncate max-w-[180px]">
                 {authorName}
               </span>
-              <OwnerBadge role={node.author?.role} size="xs" />
+              <OwnerBadge
+                role={node.author?.role}
+                badge={node.author?.badge}
+                size="xs"
+              />
               <span aria-hidden="true" className="text-[#596273]">
                 ·
               </span>
@@ -338,6 +342,7 @@ export function CommentSection({
           username: profile?.username ?? null,
           avatar_url: profile?.avatar_url ?? null,
           role: profile?.role ?? null,
+          badge: profile?.badge ?? null,
         },
       };
 
@@ -378,6 +383,7 @@ export function CommentSection({
         username: profile?.username ?? null,
         avatar_url: profile?.avatar_url ?? null,
         role: profile?.role ?? null,
+        badge: profile?.badge ?? null,
       },
     };
 

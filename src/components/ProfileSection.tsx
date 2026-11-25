@@ -8,7 +8,9 @@ import {
 } from 'react';
 import {
   AlertCircle,
+  Award,
   Camera,
+  Check,
   CheckCircle2,
   Crown,
   FileText,
@@ -17,11 +19,23 @@ import {
   MessageSquare,
   RefreshCw,
   Save,
+  Search,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { fetchOwnerStats, type OwnerPlatformStats } from '../lib/posts';
-import { MEDIA_BUCKET, isSafeHttpUrl, supabase } from '../lib/supabase';
+import {
+  fetchAllMembers,
+  fetchOwnerStats,
+  updateMemberBadge,
+  type MemberDirectoryItem,
+  type OwnerPlatformStats,
+} from '../lib/posts';
+import {
+  MEDIA_BUCKET,
+  MEMBER_BADGE_OPTIONS,
+  isSafeHttpUrl,
+  supabase,
+} from '../lib/supabase';
 import { Avatar } from './Avatar';
 import { OwnerBadge } from './OwnerBadge';
 
@@ -69,6 +83,13 @@ export function ProfileSection({
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
+  const [members, setMembers] = useState<MemberDirectoryItem[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [savedMemberId, setSavedMemberId] = useState<string | null>(null);
+
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -82,31 +103,88 @@ export function ProfileSection({
     setAvatarUrl(profile?.avatar_url ?? null);
   }, [profile]);
 
-  const loadOwnerStats = useCallback(async () => {
+  const loadOwnerPanelData = useCallback(async () => {
     if (!isOwner) return;
     setIsLoadingStats(true);
+    setIsLoadingMembers(true);
     setStatsError(null);
-    try {
-      const stats = await fetchOwnerStats();
-      setOwnerStats(stats);
-    } catch (err) {
+    setMembersError(null);
+
+    const [statsRes, membersRes] = await Promise.allSettled([
+      fetchOwnerStats(),
+      fetchAllMembers(),
+    ]);
+
+    if (statsRes.status === 'fulfilled') {
+      setOwnerStats(statsRes.value);
+    } else {
       setStatsError(
-        err instanceof Error
-          ? err.message
+        statsRes.reason instanceof Error
+          ? statsRes.reason.message
           : 'No se pudieron consultar las estadísticas.'
       );
-    } finally {
-      setIsLoadingStats(false);
     }
+    setIsLoadingStats(false);
+
+    if (membersRes.status === 'fulfilled') {
+      setMembers(membersRes.value);
+    } else {
+      setMembersError(
+        membersRes.reason instanceof Error
+          ? membersRes.reason.message
+          : 'No se pudo cargar la lista de usuarios registrados.'
+      );
+    }
+    setIsLoadingMembers(false);
   }, [isOwner]);
 
   useEffect(() => {
     if (!isOwner) {
       setOwnerStats(null);
+      setMembers([]);
       return;
     }
-    void loadOwnerStats();
-  }, [isOwner, loadOwnerStats]);
+    void loadOwnerPanelData();
+  }, [isOwner, loadOwnerPanelData]);
+
+  async function handleAssignMemberBadge(memberId: string, rawValue: string) {
+    if (!isOwner || updatingMemberId) return;
+    const nextBadge = rawValue.trim() ? rawValue.trim() : null;
+
+    setUpdatingMemberId(memberId);
+    setMembersError(null);
+    setSavedMemberId(null);
+
+    try {
+      const updated = await updateMemberBadge(memberId, nextBadge);
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === memberId ? { ...m, badge: updated.badge } : m
+        )
+      );
+      if (user && memberId === user.id && profile) {
+        setProfileState(
+          {
+            ...profile,
+            badge: updated.badge,
+          },
+          true
+        );
+      }
+      setSavedMemberId(memberId);
+      window.setTimeout(() => {
+        setSavedMemberId((curr) => (curr === memberId ? null : curr));
+      }, 2200);
+    } catch (err) {
+      setMembersError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar la insignia del usuario.'
+      );
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  }
 
   async function persistProfileRow(payload: {
     username: string | null;
@@ -122,7 +200,7 @@ export function ProfileSection({
         .from('profiles')
         .update(payload)
         .eq('id', user.id)
-        .select('id, username, bio, avatar_url, role')
+        .select('id, username, bio, avatar_url, role, badge')
         .maybeSingle();
 
       if (error) {
@@ -137,6 +215,7 @@ export function ProfileSection({
             bio: data.bio ?? null,
             avatar_url: data.avatar_url ?? null,
             role: data.role ?? profile?.role ?? null,
+            badge: data.badge ?? profile?.badge ?? null,
           },
           true
         );
@@ -153,7 +232,7 @@ export function ProfileSection({
         },
         { onConflict: 'id' }
       )
-      .select('id, username, bio, avatar_url, role')
+      .select('id, username, bio, avatar_url, role, badge')
       .single();
 
     if (error) {
@@ -167,6 +246,7 @@ export function ProfileSection({
         bio: data.bio ?? null,
         avatar_url: data.avatar_url ?? null,
         role: data.role ?? profile?.role ?? null,
+        badge: data.badge ?? profile?.badge ?? null,
       },
       true
     );
@@ -385,7 +465,7 @@ export function ProfileSection({
             >
               Mi Perfil
             </h1>
-            <OwnerBadge role={profile?.role} size="md" />
+            <OwnerBadge role={profile?.role} badge={profile?.badge} size="md" />
           </div>
           <p className="mt-1.5 text-sm text-[#97A1B2]">
             Administra tu información pública y tu foto de perfil.
@@ -433,14 +513,14 @@ export function ProfileSection({
 
             <button
               type="button"
-              onClick={() => void loadOwnerStats()}
-              disabled={isLoadingStats}
-              aria-label="Actualizar estadísticas"
+              onClick={() => void loadOwnerPanelData()}
+              disabled={isLoadingStats || isLoadingMembers}
+              aria-label="Actualizar panel del Dueño"
               className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#171B25] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
             >
               <RefreshCw
                 size={14}
-                className={isLoadingStats ? 'animate-spin' : ''}
+                className={isLoadingStats || isLoadingMembers ? 'animate-spin' : ''}
                 aria-hidden="true"
               />
               <span>Actualizar</span>
@@ -490,6 +570,163 @@ export function ProfileSection({
               </div>
             </div>
           )}
+
+          {/* Gestión de Miembros e Insignias */}
+          <div className="mt-6 border-t border-white/[0.08] pt-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Award size={17} className="text-amber-300 shrink-0" aria-hidden="true" />
+                <div>
+                  <h3 className="font-display text-base font-bold text-white">
+                    Gestión de Miembros e Insignias
+                  </h3>
+                  <p className="text-xs text-[#8F99AB]">
+                    Asigna o retira insignias visibles en Actualidad, Comunidad, Biblioteca y Arcade.
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative w-full sm:w-56">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6F7B90]"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Buscar miembro…"
+                  aria-label="Buscar miembro por nombre"
+                  className="min-h-[40px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] pl-8 pr-3 text-xs text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30"
+                />
+              </div>
+            </div>
+
+            {membersError && (
+              <div
+                role="alert"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200"
+              >
+                <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
+                <span>{membersError}</span>
+              </div>
+            )}
+
+            <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+              {isLoadingMembers && members.length === 0 ? (
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
+                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
+                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
+                </div>
+              ) : (() => {
+                const query = memberSearch.trim().toLowerCase();
+                const filteredMembers = query
+                  ? members.filter((m) => {
+                      const uname = (m.username ?? '').toLowerCase();
+                      const bdg = (m.badge ?? '').toLowerCase();
+                      return (
+                        uname.includes(query) ||
+                        bdg.includes(query) ||
+                        m.id.toLowerCase().includes(query)
+                      );
+                    })
+                  : members;
+
+                if (filteredMembers.length === 0) {
+                  return (
+                    <p className="rounded-xl border border-white/[0.06] bg-[#0B0E14] px-4 py-6 text-center text-xs text-[#8F99AB]">
+                      {query
+                        ? 'No se encontraron usuarios con ese criterio.'
+                        : 'Aún no hay miembros registrados.'}
+                    </p>
+                  );
+                }
+
+                return filteredMembers.map((member) => {
+                  const isBusy = updatingMemberId === member.id;
+                  const isJustSaved = savedMemberId === member.id;
+                  const displayName =
+                    member.username?.trim() ||
+                    `Usuario ${member.id.slice(0, 6)}`;
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex flex-col gap-3 rounded-xl border border-white/[0.07] bg-[#0B0E14] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar
+                          src={member.avatar_url}
+                          name={displayName}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold text-white">
+                              {displayName}
+                            </span>
+                            {member.id === user.id && (
+                              <span className="text-[11px] font-medium text-[#7FB2FF]">
+                                (Tú)
+                              </span>
+                            )}
+                            <OwnerBadge
+                              role={member.role}
+                              badge={member.badge}
+                              size="xs"
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-[#738096] tabular-nums">
+                            ID: {member.id.slice(0, 8)}…
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isBusy && (
+                          <Loader2
+                            size={15}
+                            className="animate-spin text-[#7FB2FF]"
+                            aria-label="Guardando insignia"
+                          />
+                        )}
+                        {isJustSaved && !isBusy && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-300">
+                            <Check size={13} aria-hidden="true" />
+                            <span>Guardado</span>
+                          </span>
+                        )}
+                        <label htmlFor={`badge-select-${member.id}`} className="sr-only">
+                          Insignia para {displayName}
+                        </label>
+                        <select
+                          id={`badge-select-${member.id}`}
+                          value={member.badge ?? ''}
+                          disabled={isBusy}
+                          onChange={(event) =>
+                            void handleAssignMemberBadge(
+                              member.id,
+                              event.target.value
+                            )
+                          }
+                          className="min-h-[40px] rounded-xl border border-white/[0.12] bg-[#141925] px-3 text-xs font-medium text-[#E5ECF5] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 disabled:opacity-50"
+                        >
+                          <option value="">Ninguna</option>
+                          {MEMBER_BADGE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -520,7 +757,7 @@ export function ProfileSection({
                 <h2 className="font-display text-lg font-semibold text-white max-w-full truncate">
                   {username.trim() || 'Sin nombre de usuario'}
                 </h2>
-                <OwnerBadge role={profile?.role} size="sm" />
+                <OwnerBadge role={profile?.role} badge={profile?.badge} size="sm" />
               </div>
 
               <p className="mt-1 text-xs text-[#8B95A5] max-w-full truncate">

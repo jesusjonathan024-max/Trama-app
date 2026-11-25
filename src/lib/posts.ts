@@ -30,6 +30,16 @@ export interface PostAuthor {
   username: string | null;
   avatar_url: string | null;
   role?: string | null;
+  badge?: string | null;
+}
+
+export interface MemberDirectoryItem {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  role: string | null;
+  badge: string | null;
+  created_at: string;
 }
 
 export interface PostRecord {
@@ -152,7 +162,7 @@ const POST_SELECT_WITH_PIN = `
   likes_count,
   is_pinned,
   created_at,
-  author:profiles!posts_author_id_fkey(id, username, avatar_url, role),
+  author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
   comments(count),
   post_likes(count)
 `;
@@ -167,7 +177,7 @@ const POST_SELECT_BASE = `
   image_url,
   likes_count,
   created_at,
-  author:profiles!posts_author_id_fkey(id, username, avatar_url, role),
+  author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
   comments(count),
   post_likes(count)
 `;
@@ -451,7 +461,7 @@ export async function fetchCommentsForPost(
   const { data, error } = await supabase
     .from('comments')
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role)'
+      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
     )
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
@@ -487,7 +497,7 @@ export async function createComment(params: {
       parent_id: params.parentId ?? null,
     })
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role)'
+      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
     )
     .single();
 
@@ -539,6 +549,59 @@ export async function fetchOwnerStats(): Promise<OwnerPlatformStats> {
     totalUsers: usersRes.count ?? 0,
     totalPosts: postsRes.count ?? 0,
     totalComments: commentsRes.count ?? 0,
+  };
+}
+
+export async function fetchAllMembers(): Promise<MemberDirectoryItem[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url, role, badge, created_at')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as MemberDirectoryItem[]).map((item) => ({
+    id: item.id,
+    username: item.username ?? null,
+    avatar_url: item.avatar_url ?? null,
+    role: item.role ?? null,
+    badge: item.badge ?? null,
+    created_at: item.created_at,
+  }));
+}
+
+export async function updateMemberBadge(
+  memberId: string,
+  badge: string | null
+): Promise<MemberDirectoryItem> {
+  const normalizedBadge = badge && badge.trim().length > 0 ? badge.trim() : null;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ badge: normalizedBadge })
+    .eq('id', memberId)
+    .select('id, username, avatar_url, role, badge, created_at')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error(
+      'Supabase no permitió actualizar la insignia de este miembro. Revisa la política RLS UPDATE del Dueño en la tabla profiles.'
+    );
+  }
+
+  return {
+    id: data.id,
+    username: data.username ?? null,
+    avatar_url: data.avatar_url ?? null,
+    role: data.role ?? null,
+    badge: data.badge ?? null,
+    created_at: data.created_at,
   };
 }
 

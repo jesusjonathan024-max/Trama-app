@@ -232,7 +232,7 @@ const SERIES_SELECT = `
   synopsis,
   cover_url,
   created_at,
-  author:profiles(id, username, avatar_url, role),
+  author:profiles(id, username, avatar_url, role, badge),
   chapters(count)
 `;
 

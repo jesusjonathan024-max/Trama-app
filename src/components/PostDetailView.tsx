@@ -313,7 +313,11 @@ export function PostDetailView({
                   <p className="text-sm font-semibold text-[#EEF2F8] truncate">
                     {authorName}
                   </p>
-                  <OwnerBadge role={post.author?.role} size="sm" />
+                  <OwnerBadge
+                    role={post.author?.role}
+                    badge={post.author?.badge}
+                    size="sm"
+                  />
                 </div>
                 <p className="text-xs text-[#8B95A5]">
                   Publicado en Actualidad
@@ -417,7 +421,11 @@ export function PostDetailView({
                 <span className="font-semibold text-white truncate max-w-[180px]">
                   {authorName}
                 </span>
-                <OwnerBadge role={post.author?.role} size="sm" />
+                <OwnerBadge
+                  role={post.author?.role}
+                  badge={post.author?.badge}
+                  size="sm"
+                />
                 <span aria-hidden="true" className="text-[#566072]">
                   ·
                 </span>
