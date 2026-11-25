@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,17 +16,28 @@ import {
 } from 'lucide-react';
 import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
-  formatDifficultyLabel,
+  ARCADE_DIFFICULTY_PRESETS,
+  applyDifficultyScore,
   getArcadeHighScores,
+  getDifficultyPreset,
   saveArcadeHighScore,
   submitGlobalArcadeScore,
   type ArcadeGameConfig,
+  type ArcadePlayDifficulty,
+  type DifficultyPreset,
 } from '../lib/arcade';
+import { RetroSynth } from '../lib/arcadeSound';
 import {
   getDailyArcadeChallenge,
   saveLocalDailyChallengeBest,
 } from '../lib/phase3';
+import { CodiceRunicoGame } from './arcade/CodiceRunicoGame';
+import { OraculoTramaGame } from './arcade/OraculoTramaGame';
+import { PulsoNeonGame } from './arcade/PulsoNeonGame';
+import { SaltoVacioGame } from './arcade/SaltoVacioGame';
+import type { MiniGameHudUpdate } from './arcade/types';
 
 export interface ArcadeChallengeMode {
   kind: 'create' | 'accept';
@@ -48,7 +59,7 @@ interface HudSnapshot {
   score: number;
   lives: number;
   maxLives: number;
-  wave: number;
+  stageLabel: string;
   combo: number;
   charge: number;
   powerupLabel: string | null;
@@ -161,89 +172,171 @@ interface ShockwaveRing {
   maxLife: number;
 }
 
-class RetroSynth {
-  private ctx: AudioContext | null = null;
-  public muted = false;
+function GameEmblemSvg({
+  game,
+  accentHex,
+}: {
+  game: ArcadeGameConfig;
+  accentHex: string;
+}) {
+  const primary =
+    game.engine === 'astral' || game.engine === 'bastion'
+      ? game.palette.primary
+      : accentHex;
+  const { accent, danger } = game.palette;
 
-  private ensureContext(): AudioContext | null {
-    if (this.muted) return null;
-    if (!this.ctx && typeof window !== 'undefined') {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
-    return this.ctx;
+  if (game.engine === 'pulso') {
+    return (
+      <svg
+        width="76"
+        height="76"
+        viewBox="0 0 76 76"
+        fill="none"
+        aria-hidden="true"
+        className="mx-auto"
+      >
+        <rect
+          x="10"
+          y="10"
+          width="56"
+          height="56"
+          rx="14"
+          stroke={primary}
+          strokeWidth="2"
+          fill={`${primary}16`}
+        />
+        <rect x="19" y="20" width="8" height="22" rx="4" fill={primary} />
+        <rect x="30" y="30" width="8" height="18" rx="4" fill="#38BDF8" />
+        <rect x="41" y="18" width="8" height="28" rx="4" fill="#F59E0B" />
+        <rect x="52" y="26" width="8" height="20" rx="4" fill="#EC4899" />
+        <line
+          x1="14"
+          y1="54"
+          x2="62"
+          y2="54"
+          stroke="#FFFFFF"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
   }
 
-  public tone(
-    freq: number,
-    duration: number,
-    type: OscillatorType = 'triangle',
-    volume = 0.08,
-    endFreq?: number
-  ) {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, now);
-      if (endFreq !== undefined) {
-        osc.frequency.exponentialRampToValueAtTime(
-          Math.max(40, endFreq),
-          now + duration
-        );
-      }
-      gain.gain.setValueAtTime(volume, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration + 0.01);
-    } catch {
-      // Silenciar fallos de Web Audio en navegadores restringidos
-    }
+  if (game.engine === 'codice') {
+    return (
+      <svg
+        width="76"
+        height="76"
+        viewBox="0 0 76 76"
+        fill="none"
+        aria-hidden="true"
+        className="mx-auto"
+      >
+        <rect
+          x="12"
+          y="12"
+          width="22"
+          height="22"
+          rx="6"
+          stroke={primary}
+          strokeWidth="2"
+          fill={`${primary}30`}
+        />
+        <rect
+          x="42"
+          y="12"
+          width="22"
+          height="22"
+          rx="6"
+          stroke={accent}
+          strokeWidth="2"
+          fill={`${accent}22`}
+        />
+        <rect
+          x="12"
+          y="42"
+          width="22"
+          height="22"
+          rx="6"
+          stroke="rgba(255,255,255,0.28)"
+          strokeWidth="1.8"
+          fill="rgba(255,255,255,0.05)"
+        />
+        <rect
+          x="42"
+          y="42"
+          width="22"
+          height="22"
+          rx="6"
+          stroke={primary}
+          strokeWidth="2"
+          fill={`${primary}45`}
+        />
+        <path
+          d="M23 23H53V53"
+          stroke="#FFFFFF"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
   }
 
-  public pickup(combo: number) {
-    const base = 440 + Math.min(combo, 6) * 65;
-    this.tone(base, 0.09, 'triangle', 0.09, base * 1.35);
+  if (game.engine === 'salto') {
+    return (
+      <svg
+        width="76"
+        height="76"
+        viewBox="0 0 76 76"
+        fill="none"
+        aria-hidden="true"
+        className="mx-auto"
+      >
+        <rect x="14" y="56" width="26" height="6" rx="3" fill={primary} />
+        <rect x="38" y="40" width="24" height="6" rx="3" fill="#38BDF8" />
+        <rect x="18" y="24" width="22" height="6" rx="3" fill="#10B981" />
+        <circle cx="29" cy="14" r="7" fill={primary} stroke="#FFFFFF" strokeWidth="1.8" />
+        <path
+          d="M27 52C28 45 36 45 44 37"
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="2"
+          strokeDasharray="3 3"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
   }
 
-  public shoot() {
-    this.tone(620, 0.045, 'square', 0.028, 320);
+  if (game.engine === 'oraculo') {
+    return (
+      <svg
+        width="76"
+        height="76"
+        viewBox="0 0 76 76"
+        fill="none"
+        aria-hidden="true"
+        className="mx-auto"
+      >
+        <circle
+          cx="38"
+          cy="38"
+          r="28"
+          stroke={primary}
+          strokeWidth="2.4"
+          fill={`${primary}18`}
+        />
+        <path
+          d="M31 29C31 24.5 34.2 22 38.4 22C42.5 22 45.5 24.4 45.5 28.2C45.5 31.3 43.7 33 40.7 34.9C38.7 36.2 38 37.5 38 40V42"
+          stroke="#FFFFFF"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+        <circle cx="38" cy="50" r="2.6" fill={accent} />
+      </svg>
+    );
   }
 
-  public hitEnemy(isBoss = false) {
-    this.tone(isBoss ? 180 : 280, isBoss ? 0.14 : 0.07, 'sawtooth', 0.07, 90);
-  }
-
-  public damage() {
-    this.tone(160, 0.22, 'sawtooth', 0.11, 55);
-  }
-
-  public ability() {
-    this.tone(360, 0.12, 'sine', 0.1, 880);
-    setTimeout(() => this.tone(540, 0.16, 'triangle', 0.08, 1080), 55);
-  }
-
-  public gameOver() {
-    this.tone(320, 0.16, 'triangle', 0.09, 240);
-    setTimeout(() => this.tone(220, 0.28, 'sawtooth', 0.08, 95), 140);
-  }
-}
-
-function GameEmblemSvg({ game }: { game: ArcadeGameConfig }) {
-  const { primary, accent, danger } = game.palette;
   if (game.engine === 'bastion') {
     return (
       <svg
@@ -323,8 +416,18 @@ export function ArcadeGameModal({
   onHighScoreUpdated,
 }: ArcadeGameModalProps) {
   const { user } = useAuth();
+  const { accentColor, themeMode } = useTheme();
   const { checkArcadeAchievements } = useAchievements();
+
   const [phase, setPhase] = useState<GamePhase>('TITLE_MENU');
+  const [selectedDifficultyId, setSelectedDifficultyId] =
+    useState<ArcadePlayDifficulty>('normal');
+  const [playedDifficulty, setPlayedDifficulty] = useState<DifficultyPreset>(() =>
+    getDifficultyPreset('normal')
+  );
+  const [rawScoreResult, setRawScoreResult] = useState(0);
+  const [finalScoreResult, setFinalScoreResult] = useState(0);
+  const [matchSummaryNote, setMatchSummaryNote] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [bestScore, setBestScore] = useState(0);
   const [isNewRecord, setIsNewRecord] = useState(false);
@@ -342,11 +445,30 @@ export function ArcadeGameModal({
     score: 0,
     lives: 3,
     maxLives: 3,
-    wave: 1,
+    stageLabel: 'Ol. 1',
     combo: 1,
     charge: 100,
     powerupLabel: null,
   });
+
+  const selectedDifficulty = useMemo(
+    () => getDifficultyPreset(selectedDifficultyId),
+    [selectedDifficultyId]
+  );
+
+  // Resuelve el color de acento activo (--accent-primary) para los lienzos Canvas
+  const accentHex = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const cssVal = getComputedStyle(document.documentElement)
+        .getPropertyValue('--accent-primary')
+        .trim();
+      if (cssVal) return cssVal;
+    }
+    if (accentColor === 'violet') {
+      return themeMode === 'light' ? '#7C3AED' : '#8B5CF6';
+    }
+    return themeMode === 'light' ? '#2563EB' : '#3B82F6';
+  }, [accentColor, themeMode]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -359,8 +481,9 @@ export function ArcadeGameModal({
   const onMatchFinishedRef = useRef(onMatchFinished);
   onMatchFinishedRef.current = onMatchFinished;
   const duelSubmittedRef = useRef(false);
+  const activeDifficultyRef = useRef<DifficultyPreset>(selectedDifficulty);
 
-  // Entrada de teclado en 8 direcciones (X y Y)
+  // Entrada de teclado en 8 direcciones (X y Y) para Senda Astral / Bastión de Runas
   const keysRef = useRef<{
     up: boolean;
     down: boolean;
@@ -373,7 +496,7 @@ export function ArcadeGameModal({
     right: false,
   });
 
-  // Desplazamiento relativo táctil / puntero (para que el dedo nunca tape al personaje)
+  // Desplazamiento relativo táctil / puntero
   const pointerStateRef = useRef<{
     activeId: number | null;
     lastX: number;
@@ -393,6 +516,9 @@ export function ArcadeGameModal({
   phaseRef.current = phase;
   synthRef.current.muted = muted;
 
+  const isClassicCanvasEngine =
+    game?.engine === 'astral' || game?.engine === 'bastion';
+
   useEffect(() => {
     if (!game) return;
     const scores = getArcadeHighScores();
@@ -405,29 +531,173 @@ export function ArcadeGameModal({
     duelSubmittedRef.current = false;
     setGlobalScoreStatus('idle');
     setGlobalScoreNote(null);
+    setRawScoreResult(0);
+    setFinalScoreResult(0);
+    setMatchSummaryNote(null);
+    const preset = getDifficultyPreset(selectedDifficultyId);
     setHud({
       score: 0,
-      lives: 3,
-      maxLives: 3,
-      wave: 1,
+      lives: preset.maxLives,
+      maxLives: preset.maxLives,
+      stageLabel:
+        game.engine === 'pulso'
+          ? 'Ritmo 1'
+          : game.engine === 'codice'
+            ? 'Ronda 1'
+            : game.engine === 'salto'
+              ? '0 m'
+              : game.engine === 'oraculo'
+                ? '1/20'
+                : 'Ol. 1',
       combo: 1,
       charge: game.engine === 'astral' ? 100 : 40,
       powerupLabel: null,
     });
   }, [game, challengeMode]);
 
+  const finalizeMatch = useCallback(
+    (rawScore: number, summaryNote?: string) => {
+      if (!game) return;
+      const diff = activeDifficultyRef.current;
+      const cleanRaw = Math.max(0, Math.floor(rawScore));
+      const finalScore = applyDifficultyScore(cleanRaw, diff);
+
+      setRawScoreResult(cleanRaw);
+      setFinalScoreResult(finalScore);
+      setPlayedDifficulty(diff);
+      setMatchSummaryNote(summaryNote ?? null);
+      setHud((prev) => ({ ...prev, score: finalScore, lives: 0 }));
+
+      const beatRecord = saveArcadeHighScore(game.id, finalScore);
+      setIsNewRecord(beatRecord);
+      if (beatRecord) {
+        setBestScore(finalScore);
+      }
+
+      const daily = getDailyArcadeChallenge();
+      saveLocalDailyChallengeBest(daily.dateKey, game.id, finalScore);
+      const didCompleteDaily =
+        game.id === daily.gameId && finalScore >= daily.targetScore;
+      setCompletedDailyRun(didCompleteDaily);
+
+      onHighScoreUpdated();
+      synthRef.current.gameOver();
+      setPhase('GAME_OVER');
+
+      if (onMatchFinishedRef.current && !duelSubmittedRef.current) {
+        duelSubmittedRef.current = true;
+        setDuelStatus('saving');
+        setDuelSummary(null);
+        Promise.resolve(onMatchFinishedRef.current(finalScore))
+          .then((summaryText) => {
+            setDuelStatus('done');
+            setDuelSummary(summaryText ?? 'Resultado del duelo registrado.');
+          })
+          .catch((err: unknown) => {
+            setDuelStatus('error');
+            setDuelSummary(
+              err instanceof Error
+                ? err.message
+                : 'No se pudo guardar el resultado del duelo 1v1.'
+            );
+          });
+      }
+
+      const activeUserId = userIdRef.current;
+      if (!activeUserId) {
+        setGlobalScoreStatus('guest');
+        setGlobalScoreNote(null);
+      } else {
+        void checkArcadeAchievementsRef.current({
+          score: finalScore,
+          completedDailyChallenge: didCompleteDaily,
+        });
+
+        if (finalScore > 0) {
+          setGlobalScoreStatus('saving');
+          setGlobalScoreNote(null);
+          void submitGlobalArcadeScore({
+            userId: activeUserId,
+            gameId: game.id,
+            score: finalScore,
+          })
+            .then((result) => {
+              onHighScoreUpdated();
+              if (result.saved) {
+                setGlobalScoreStatus('saved');
+                setGlobalScoreNote(null);
+              } else {
+                setGlobalScoreStatus('not_higher');
+                setGlobalScoreNote(
+                  `Partida registrada en rankings · Tu mejor récord histórico es ${result.bestScore.toLocaleString('es-ES')} pts.`
+                );
+              }
+            })
+            .catch((err: unknown) => {
+              setGlobalScoreStatus('error');
+              setGlobalScoreNote(
+                err instanceof Error
+                  ? err.message
+                  : 'No se pudo guardar en el Top 10 Global.'
+              );
+            });
+        }
+      }
+    },
+    [game, onHighScoreUpdated]
+  );
+
+  const finalizeMatchRef = useRef(finalizeMatch);
+  finalizeMatchRef.current = finalizeMatch;
+
+  const handleMiniGameHud = useCallback((next: MiniGameHudUpdate) => {
+    setHud((prev) => ({
+      ...prev,
+      score: next.score,
+      lives: next.lives,
+      maxLives: next.maxLives,
+      stageLabel: next.stageLabel,
+      combo: next.combo,
+      powerupLabel: next.statusLabel ?? null,
+    }));
+  }, []);
+
   const startNewRun = useCallback(() => {
     if (!game) return;
+    const preset = getDifficultyPreset(selectedDifficultyId);
+    activeDifficultyRef.current = preset;
+    setPlayedDifficulty(preset);
     pointerStateRef.current.pendingDx = 0;
     pointerStateRef.current.pendingDy = 0;
     setIsNewRecord(false);
     setCompletedDailyRun(false);
     setGlobalScoreStatus('idle');
     setGlobalScoreNote(null);
+    setRawScoreResult(0);
+    setFinalScoreResult(0);
+    setMatchSummaryNote(null);
+    setHud({
+      score: 0,
+      lives: preset.maxLives,
+      maxLives: preset.maxLives,
+      stageLabel:
+        game.engine === 'pulso'
+          ? 'Ritmo 1'
+          : game.engine === 'codice'
+            ? 'Ronda 1'
+            : game.engine === 'salto'
+              ? '0 m'
+              : game.engine === 'oraculo'
+                ? '1/20'
+                : 'Ol. 1',
+      combo: 1,
+      charge: game.engine === 'astral' ? 100 : 40,
+      powerupLabel: null,
+    });
     setPhase('PLAYING');
     setRunKey((prev) => prev + 1);
     synthRef.current.ability();
-  }, [game]);
+  }, [game, selectedDifficultyId]);
 
   const triggerAbility = useCallback(() => {
     if (phaseRef.current === 'PLAYING') {
@@ -435,7 +705,7 @@ export function ArcadeGameModal({
     }
   }, []);
 
-  // Controles de teclado omnidireccionales (WASD + Flechas + Espacio)
+  // Controles de teclado globales (Escape / P para pausa; WASD + Flechas + Espacio solo en Astral/Bastión)
   useEffect(() => {
     if (!game) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -455,6 +725,8 @@ export function ArcadeGameModal({
         else if (phaseRef.current === 'PAUSED') setPhase('PLAYING');
         return;
       }
+
+      if (!isClassicCanvasEngine) return;
 
       const key = event.key;
       if (key === 'ArrowUp' || key === 'w' || key === 'W') {
@@ -484,6 +756,7 @@ export function ArcadeGameModal({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
+      if (!isClassicCanvasEngine) return;
       const key = event.key;
       if (key === 'ArrowUp' || key === 'w' || key === 'W') {
         keysRef.current.up = false;
@@ -512,11 +785,17 @@ export function ArcadeGameModal({
       window.removeEventListener('blur', handleBlur);
       keysRef.current = { up: false, down: false, left: false, right: false };
     };
-  }, [game, onClose, startNewRun]);
+  }, [game, isClassicCanvasEngine, onClose, startNewRun]);
 
-  // Motor principal HTML5 Canvas 2D con movimiento libre omnidireccional (60fps, dt clamped)
+  // Motor principal HTML5 Canvas 2D para Senda Astral y Bastión de Runas
   useEffect(() => {
-    if (!game || runKey === 0) return;
+    if (
+      !game ||
+      runKey === 0 ||
+      (game.engine !== 'astral' && game.engine !== 'bastion')
+    ) {
+      return;
+    }
     const canvas = canvasRef.current;
     const container = stageRef.current;
     if (!canvas || !container) return;
@@ -540,7 +819,10 @@ export function ArcadeGameModal({
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    const { palette, speedMultiplier, spawnMultiplier, engine } = game;
+    const activeDiff = activeDifficultyRef.current;
+    const { palette, engine } = game;
+    const speedMultiplier = game.speedMultiplier * activeDiff.speedScale;
+    const spawnMultiplier = game.spawnMultiplier * activeDiff.spawnScale;
     const synth = synthRef.current;
 
     const stars: Star[] = Array.from({ length: 58 }, () => ({
@@ -556,11 +838,11 @@ export function ArcadeGameModal({
     const floatingTexts: FloatingText[] = [];
     const shockwaves: ShockwaveRing[] = [];
 
-    // Estado general
+    // Estado general calibrado por dificultad seleccionada
     let elapsed = 0;
     let score = 0;
-    let lives = 3;
-    const maxLives = 3;
+    const maxLives = activeDiff.maxLives;
+    let lives = maxLives;
     let wave = 1;
     let combo = 1;
     let comboTimer = 0;
@@ -621,7 +903,7 @@ export function ArcadeGameModal({
           score: roundedScore,
           lives,
           maxLives,
-          wave,
+          stageLabel: `Ol. ${wave}`,
           combo,
           charge: roundedCharge,
           powerupLabel,
@@ -665,93 +947,34 @@ export function ArcadeGameModal({
 
     const triggerPlayerDamage = (px: number, py: number) => {
       if (invulnTimer > 0 || dashTimer > 0) return;
-      lives = Math.max(0, lives - 1);
+      const dmg = activeDiff.damageScale;
+      lives = Math.max(0, lives - dmg);
       combo = 1;
-      invulnTimer = 1.4;
+      invulnTimer =
+        activeDiff.id === 'facil'
+          ? 1.7
+          : activeDiff.id === 'dificil'
+            ? 1.1
+            : activeDiff.id === 'pesadilla'
+              ? 0.95
+              : 1.4;
       hitstopTimer = 0.045;
-      shakeMag = 12;
+      shakeMag = dmg > 1 ? 16 : 12;
       synth.damage();
       spawnBurst(px, py, palette.danger, 20, 230);
-      spawnFloat(px, py - 24, '-1 ESCUDO', palette.danger);
+      spawnFloat(
+        px,
+        py - 24,
+        dmg > 1 ? `-${dmg} ESCUDOS` : '-1 ESCUDO',
+        palette.danger
+      );
 
       if (lives <= 0) {
-        const finalScore = Math.floor(score);
-        const beatRecord = saveArcadeHighScore(game.id, finalScore);
-        setIsNewRecord(beatRecord);
-        if (beatRecord) {
-          setBestScore(finalScore);
-        }
-
-        const daily = getDailyArcadeChallenge();
-        saveLocalDailyChallengeBest(daily.dateKey, game.id, finalScore);
-        const didCompleteDaily =
-          game.id === daily.gameId && finalScore >= daily.targetScore;
-        setCompletedDailyRun(didCompleteDaily);
-
-        onHighScoreUpdated();
         syncHud();
-        synth.gameOver();
-        setPhase('GAME_OVER');
-
-        if (onMatchFinishedRef.current && !duelSubmittedRef.current) {
-          duelSubmittedRef.current = true;
-          setDuelStatus('saving');
-          setDuelSummary(null);
-          Promise.resolve(onMatchFinishedRef.current(finalScore))
-            .then((summaryText) => {
-              setDuelStatus('done');
-              setDuelSummary(summaryText ?? 'Resultado del duelo registrado.');
-            })
-            .catch((err: unknown) => {
-              setDuelStatus('error');
-              setDuelSummary(
-                err instanceof Error
-                  ? err.message
-                  : 'No se pudo guardar el resultado del duelo 1v1.'
-              );
-            });
-        }
-
-        const activeUserId = userIdRef.current;
-        if (!activeUserId) {
-          setGlobalScoreStatus('guest');
-          setGlobalScoreNote(null);
-        } else {
-          void checkArcadeAchievementsRef.current({
-            score: finalScore,
-            completedDailyChallenge: didCompleteDaily,
-          });
-
-          if (finalScore > 0) {
-            setGlobalScoreStatus('saving');
-            setGlobalScoreNote(null);
-            void submitGlobalArcadeScore({
-              userId: activeUserId,
-              gameId: game.id,
-              score: finalScore,
-            })
-              .then((result) => {
-                onHighScoreUpdated();
-                if (result.saved) {
-                  setGlobalScoreStatus('saved');
-                  setGlobalScoreNote(null);
-                } else {
-                  setGlobalScoreStatus('not_higher');
-                  setGlobalScoreNote(
-                    `Partida registrada en rankings · Tu mejor récord histórico es ${result.bestScore.toLocaleString('es-ES')} pts.`
-                  );
-                }
-              })
-              .catch((err: unknown) => {
-                setGlobalScoreStatus('error');
-                setGlobalScoreNote(
-                  err instanceof Error
-                    ? err.message
-                    : 'No se pudo guardar en el Top 10 Global.'
-                );
-              });
-          }
-        }
+        finalizeMatchRef.current(
+          Math.floor(score),
+          `Oleada alcanzada: ${wave}`
+        );
       }
     };
 
@@ -1749,18 +1972,23 @@ export function ArcadeGameModal({
               <div className="flex items-center gap-2.5 text-sm font-bold tabular-nums text-white">
                 <span>{hud.score.toLocaleString('es-ES')}</span>
                 <span className="text-[11px] font-medium text-amber-300">
-                  Ol. {hud.wave}
+                  {hud.stageLabel}
                 </span>
                 {hud.combo > 1 && (
                   <span className="text-[11px] font-semibold text-[#7FB2FF]">
                     x{hud.combo}
                   </span>
                 )}
+                {phase !== 'TITLE_MENU' && (
+                  <span className="hidden sm:inline text-[10px] font-semibold text-[#9AA4B6]">
+                    · {playedDifficulty.label} {playedDifficulty.multiplierLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Vidas */}
             <div
               aria-label={`Escudos restantes: ${hud.lives}`}
@@ -1769,7 +1997,7 @@ export function ArcadeGameModal({
               {Array.from({ length: hud.maxLives }).map((_, idx) => (
                 <Shield
                   key={idx}
-                  size={14}
+                  size={13}
                   className={
                     idx < hud.lives
                       ? 'fill-emerald-400 text-emerald-400'
@@ -1815,78 +2043,124 @@ export function ArcadeGameModal({
           </div>
         </header>
 
-        {/* Área principal del lienzo (85%+ libre, desplazamiento táctil relativo en 2D) */}
+        {/* Área principal del juego */}
         <div
           ref={stageRef}
           className="relative flex-1 w-full overflow-hidden touch-none select-none"
         >
-          <canvas
-            ref={canvasRef}
-            onPointerDown={(event) => {
-              event.currentTarget.setPointerCapture(event.pointerId);
-              pointerStateRef.current.activeId = event.pointerId;
-              pointerStateRef.current.lastX = event.clientX;
-              pointerStateRef.current.lastY = event.clientY;
-            }}
-            onPointerMove={(event) => {
-              const ps = pointerStateRef.current;
-              if (ps.activeId !== event.pointerId) return;
-              ps.pendingDx += event.clientX - ps.lastX;
-              ps.pendingDy += event.clientY - ps.lastY;
-              ps.lastX = event.clientX;
-              ps.lastY = event.clientY;
-            }}
-            onPointerUp={(event) => {
-              if (pointerStateRef.current.activeId === event.pointerId) {
-                pointerStateRef.current.activeId = null;
-              }
-            }}
-            onPointerCancel={(event) => {
-              if (pointerStateRef.current.activeId === event.pointerId) {
-                pointerStateRef.current.activeId = null;
-              }
-            }}
-            className="block h-full w-full"
-          />
+          {isClassicCanvasEngine ? (
+            <>
+              <canvas
+                ref={canvasRef}
+                onPointerDown={(event) => {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  pointerStateRef.current.activeId = event.pointerId;
+                  pointerStateRef.current.lastX = event.clientX;
+                  pointerStateRef.current.lastY = event.clientY;
+                }}
+                onPointerMove={(event) => {
+                  const ps = pointerStateRef.current;
+                  if (ps.activeId !== event.pointerId) return;
+                  ps.pendingDx += event.clientX - ps.lastX;
+                  ps.pendingDy += event.clientY - ps.lastY;
+                  ps.lastX = event.clientX;
+                  ps.lastY = event.clientY;
+                }}
+                onPointerUp={(event) => {
+                  if (pointerStateRef.current.activeId === event.pointerId) {
+                    pointerStateRef.current.activeId = null;
+                  }
+                }}
+                onPointerCancel={(event) => {
+                  if (pointerStateRef.current.activeId === event.pointerId) {
+                    pointerStateRef.current.activeId = null;
+                  }
+                }}
+                className="block h-full w-full"
+              />
 
-          {/* Indicador compacto de poder activo */}
-          {phase === 'PLAYING' && hud.powerupLabel && (
-            <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-[#0B0F18]/90 border border-amber-400/35 px-2.5 py-1 text-[11px] font-semibold text-amber-300 tabular-nums">
-              {hud.powerupLabel}
-            </div>
-          )}
-
-          {/* Botón táctil cómodo para habilidad especial (sin interferir con el arrastre) */}
-          {phase === 'PLAYING' && (
-            <button
-              type="button"
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                triggerAbility();
-              }}
-              disabled={!isAbilityReady}
-              className={`absolute bottom-5 right-4 z-10 min-h-[52px] inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold tracking-wide transition-all active:scale-95 ${
-                isAbilityReady
-                  ? 'border-amber-300/60 bg-amber-400 text-[#090B0E] shadow-lg shadow-amber-400/20'
-                  : 'border-white/[0.12] bg-[#11151E]/90 text-[#8F99AB]'
-              }`}
-            >
-              {game.engine === 'astral' ? (
-                <Zap size={16} aria-hidden="true" />
-              ) : (
-                <Sparkles size={16} aria-hidden="true" />
+              {/* Indicador compacto de poder activo */}
+              {phase === 'PLAYING' && hud.powerupLabel && (
+                <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-[#0B0F18]/90 border border-amber-400/35 px-2.5 py-1 text-[11px] font-semibold text-amber-300 tabular-nums">
+                  {hud.powerupLabel}
+                </div>
               )}
-              <span className="tabular-nums">
-                {game.engine === 'astral' ? 'Impulso' : 'Nova'} {hud.charge}%
-              </span>
-            </button>
-          )}
 
-          {/* PANTALLA DE TÍTULO (TITLE_MENU) */}
+              {/* Botón táctil cómodo para habilidad especial */}
+              {phase === 'PLAYING' && (
+                <button
+                  type="button"
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    triggerAbility();
+                  }}
+                  disabled={!isAbilityReady}
+                  className={`absolute bottom-5 right-4 z-10 min-h-[52px] inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold tracking-wide transition-all active:scale-95 ${
+                    isAbilityReady
+                      ? 'border-amber-300/60 bg-amber-400 text-[#090B0E] shadow-lg shadow-amber-400/20'
+                      : 'border-white/[0.12] bg-[#11151E]/90 text-[#8F99AB]'
+                  }`}
+                >
+                  {game.engine === 'astral' ? (
+                    <Zap size={16} aria-hidden="true" />
+                  ) : (
+                    <Sparkles size={16} aria-hidden="true" />
+                  )}
+                  <span className="tabular-nums">
+                    {game.engine === 'astral' ? 'Impulso' : 'Nova'} {hud.charge}%
+                  </span>
+                </button>
+              )}
+            </>
+          ) : runKey > 0 ? (
+            game.engine === 'pulso' ? (
+              <PulsoNeonGame
+                difficulty={playedDifficulty}
+                paused={phase !== 'PLAYING'}
+                runKey={runKey}
+                accentHex={accentHex}
+                synth={synthRef.current}
+                onHudUpdate={handleMiniGameHud}
+                onGameOver={finalizeMatch}
+              />
+            ) : game.engine === 'codice' ? (
+              <CodiceRunicoGame
+                difficulty={playedDifficulty}
+                paused={phase !== 'PLAYING'}
+                runKey={runKey}
+                accentHex={accentHex}
+                synth={synthRef.current}
+                onHudUpdate={handleMiniGameHud}
+                onGameOver={finalizeMatch}
+              />
+            ) : game.engine === 'salto' ? (
+              <SaltoVacioGame
+                difficulty={playedDifficulty}
+                paused={phase !== 'PLAYING'}
+                runKey={runKey}
+                accentHex={accentHex}
+                synth={synthRef.current}
+                onHudUpdate={handleMiniGameHud}
+                onGameOver={finalizeMatch}
+              />
+            ) : (
+              <OraculoTramaGame
+                difficulty={playedDifficulty}
+                paused={phase !== 'PLAYING'}
+                runKey={runKey}
+                accentHex={accentHex}
+                synth={synthRef.current}
+                onHudUpdate={handleMiniGameHud}
+                onGameOver={finalizeMatch}
+              />
+            )
+          ) : null}
+
+          {/* PANTALLA DE TÍTULO (TITLE_MENU) CON SELECTOR UNIVERSAL DE DIFICULTAD */}
           {phase === 'TITLE_MENU' && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080B12] px-6 text-center">
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-y-auto bg-[#080B12] px-5 py-6 text-center">
               {challengeMode && (
-                <div className="mb-4 max-w-xs rounded-xl border border-amber-400/45 bg-amber-400/12 px-3.5 py-2 text-xs text-amber-200">
+                <div className="mb-3 max-w-sm rounded-xl border border-amber-400/45 bg-amber-400/12 px-3.5 py-2 text-xs text-amber-200">
                   {challengeMode.kind === 'create' ? (
                     <span>
                       <strong>Reto 1v1 contra {challengeMode.opponentName}</strong>
@@ -1905,19 +2179,72 @@ export function ArcadeGameModal({
                 </div>
               )}
 
-              <GameEmblemSvg game={game} />
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-amber-300">
-                {game.genre} · {formatDifficultyLabel(game.difficulty)}
+              <GameEmblemSvg game={game} accentHex={accentHex} />
+              <p className="mt-3 text-xs font-semibold text-amber-300">
+                {game.genre}
               </p>
-              <h2 className="mt-1.5 font-display text-3xl font-bold tracking-tight text-white">
+              <h2 className="mt-1 font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
                 {game.title}
               </h2>
-              <p className="mt-2 max-w-xs text-sm leading-relaxed text-[#9AA4B6]">
+              <p className="mt-1.5 max-w-sm text-xs sm:text-sm leading-relaxed text-[#9AA4B6]">
                 {game.lore}
               </p>
 
-              <div className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#11151F] px-3.5 py-2 text-xs text-[#D5DCE6]">
-                <Trophy size={14} className="text-amber-300" aria-hidden="true" />
+              {/* Selector Universal de Dificultad (4 niveles) */}
+              <div className="mt-4 w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#101521] p-3 text-left">
+                <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#9AA4B6]">
+                  <span>Elige dificultad</span>
+                  <span className="tabular-nums text-amber-300">
+                    Puntaje {selectedDifficulty.multiplierLabel}
+                  </span>
+                </div>
+
+                <div
+                  role="radiogroup"
+                  aria-label="Seleccionar dificultad de la partida"
+                  className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4"
+                >
+                  {ARCADE_DIFFICULTY_PRESETS.map((preset) => {
+                    const active = selectedDifficultyId === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setSelectedDifficultyId(preset.id)}
+                        className={`min-h-[44px] flex flex-col items-center justify-center rounded-xl border px-2 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                          active
+                            ? preset.id === 'pesadilla'
+                              ? 'border-rose-500 bg-rose-500/20 text-rose-200'
+                              : preset.id === 'dificil'
+                                ? 'border-amber-400 bg-amber-400/20 text-amber-200'
+                                : 'border-[var(--accent-primary)] bg-[var(--accent-soft)] text-white'
+                            : 'border-white/[0.08] bg-[#161C2B] text-[#9AA4B6] hover:border-white/20 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-bold leading-tight">
+                          {preset.label}
+                        </span>
+                        <span className="mt-0.5 text-[10px] font-mono tabular-nums opacity-85">
+                          {preset.multiplierLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-2 text-[11px] leading-snug text-[#9AA4B6]">
+                  {game.engine === 'codice'
+                    ? `Tablero ${selectedDifficulty.codiceGridSize}×${selectedDifficulty.codiceGridSize} · ${selectedDifficulty.summary}`
+                    : game.engine === 'oraculo'
+                      ? `${selectedDifficulty.triviaSeconds}s por pregunta${selectedDifficulty.triviaWrongPenalty > 0 ? ` · -${selectedDifficulty.triviaWrongPenalty} pts al fallar` : ''} · ${selectedDifficulty.summary}`
+                      : selectedDifficulty.summary}
+                </p>
+              </div>
+
+              <div className="mt-3.5 inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#11151F] px-3.5 py-1.5 text-xs text-[#D5DCE6]">
+                <Trophy size={13} className="text-amber-300" aria-hidden="true" />
                 <span>Récord personal:</span>
                 <strong className="tabular-nums text-white">
                   {bestScore.toLocaleString('es-ES')}
@@ -1927,13 +2254,13 @@ export function ArcadeGameModal({
               <button
                 type="button"
                 onClick={startNewRun}
-                className="mt-6 min-h-[50px] min-w-[200px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-7 py-3 text-base font-bold text-[#06101F] hover:bg-[#529BFF] active:scale-[0.98] transition-all"
+                className="mt-4 min-h-[48px] min-w-[200px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-7 py-2.5 text-sm sm:text-base font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all"
               >
                 <Play size={18} className="fill-current" aria-hidden="true" />
                 <span>{challengeMode ? 'Iniciar duelo' : 'Jugar'}</span>
               </button>
 
-              <p className="mt-5 text-xs text-[#7D879A]">
+              <p className="mt-3.5 text-[11px] text-[#7D879A]">
                 {game.controlsHint}
               </p>
             </div>
@@ -1946,13 +2273,14 @@ export function ArcadeGameModal({
                 Partida en pausa
               </h3>
               <p className="mt-1.5 text-sm text-[#9AA4B6] tabular-nums">
-                Puntaje actual: {hud.score.toLocaleString('es-ES')}
+                Puntaje actual: {hud.score.toLocaleString('es-ES')} ·{' '}
+                {playedDifficulty.label} ({playedDifficulty.multiplierLabel})
               </p>
               <div className="mt-6 flex w-full max-w-xs flex-col gap-2.5">
                 <button
                   type="button"
                   onClick={() => setPhase('PLAYING')}
-                  className="min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 text-sm font-bold text-[#06101F] hover:bg-[#529BFF] transition-colors"
+                  className="min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 text-sm font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] transition-colors"
                 >
                   <Play size={16} className="fill-current" aria-hidden="true" />
                   <span>Continuar</span>
@@ -1978,7 +2306,7 @@ export function ArcadeGameModal({
 
           {/* PANTALLA DE FIN DE PARTIDA (GAME_OVER) */}
           {phase === 'GAME_OVER' && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080B12]/94 px-6 text-center">
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-y-auto bg-[#080B12]/95 px-5 py-6 text-center">
               {isNewRecord && (
                 <div className="mb-2 inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
                   <Trophy size={14} aria-hidden="true" />
@@ -1987,7 +2315,7 @@ export function ArcadeGameModal({
               )}
 
               {completedDailyRun && (
-                <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
+                <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
                   <CheckCircle2 size={14} aria-hidden="true" />
                   <span>¡Reto del Día completado!</span>
                 </div>
@@ -1995,7 +2323,7 @@ export function ArcadeGameModal({
 
               {challengeMode && (
                 <div
-                  className={`mb-3 max-w-xs rounded-xl border px-3.5 py-2 text-xs font-semibold ${
+                  className={`mb-2.5 max-w-xs rounded-xl border px-3.5 py-2 text-xs font-semibold ${
                     duelStatus === 'error'
                       ? 'border-red-500/40 bg-red-500/15 text-red-200'
                       : 'border-amber-400/45 bg-amber-400/15 text-amber-200'
@@ -2012,69 +2340,121 @@ export function ArcadeGameModal({
                 </div>
               )}
 
-              <h3 className="font-display text-3xl font-bold text-white">
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-white">
                 Fin de la partida
               </h3>
 
-              <div className="mt-5 grid w-full max-w-xs grid-cols-2 gap-3">
+              {/* Etiqueta de dificultad jugada */}
+              <p className="mt-1.5 text-xs font-semibold text-[#D5DCE6]">
+                Dificultad jugada:{' '}
+                <span
+                  className={
+                    playedDifficulty.id === 'pesadilla'
+                      ? 'text-rose-400'
+                      : playedDifficulty.id === 'dificil'
+                        ? 'text-amber-300'
+                        : 'text-[#7FB2FF]'
+                  }
+                >
+                  {playedDifficulty.label} ({playedDifficulty.multiplierLabel})
+                </span>
+              </p>
+
+              {matchSummaryNote && (
+                <p className="mt-1 text-xs text-[#9AA4B6]">{matchSummaryNote}</p>
+              )}
+
+              <div className="mt-4 grid w-full max-w-xs grid-cols-2 gap-3">
                 <div className="rounded-xl border border-white/[0.08] bg-[#11151F] px-3 py-3">
-                  <p className="text-[11px] text-[#8B95A5]">Puntaje</p>
+                  <p className="text-[11px] text-[#8B95A5]">Puntaje final</p>
                   <p className="mt-1 font-display text-2xl font-bold tabular-nums text-white">
-                    {hud.score.toLocaleString('es-ES')}
+                    {finalScoreResult.toLocaleString('es-ES')}
                   </p>
+                  {playedDifficulty.scoreMultiplier !== 1 && (
+                    <p className="mt-0.5 text-[10px] text-[#8B95A5] tabular-nums">
+                      Base {rawScoreResult.toLocaleString('es-ES')}{' '}
+                      {playedDifficulty.multiplierLabel}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-xl border border-white/[0.08] bg-[#11151F] px-3 py-3">
                   <p className="text-[11px] text-[#8B95A5]">Mejor récord</p>
                   <p className="mt-1 font-display text-2xl font-bold tabular-nums text-amber-300">
-                    {Math.max(bestScore, hud.score).toLocaleString('es-ES')}
+                    {Math.max(bestScore, finalScoreResult).toLocaleString('es-ES')}
                   </p>
                 </div>
               </div>
 
               {globalScoreStatus === 'saving' && (
-                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs text-[#9AA4B6]">
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#9AA4B6]">
                   <Loader2 size={13} className="animate-spin text-[#7FB2FF]" aria-hidden="true" />
                   <span>Sincronizando con el Top 10 Global…</span>
                 </p>
               )}
 
               {globalScoreStatus === 'saved' && (
-                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
                   <CheckCircle2 size={14} aria-hidden="true" />
                   <span>¡Nuevo récord guardado en el Top 10 Global!</span>
                 </p>
               )}
 
               {globalScoreStatus === 'not_higher' && globalScoreNote && (
-                <p className="mt-3.5 text-xs text-[#8F99AB]">{globalScoreNote}</p>
+                <p className="mt-3 text-xs text-[#8F99AB]">{globalScoreNote}</p>
               )}
 
               {globalScoreStatus === 'guest' && (
-                <p className="mt-3.5 text-xs text-[#8F99AB]">
+                <p className="mt-3 text-xs text-[#8F99AB]">
                   Inicia sesión para registrar tu puntaje en el Top 10 Global.
                 </p>
               )}
 
               {globalScoreStatus === 'error' && globalScoreNote && (
-                <p className="mt-3.5 inline-flex items-center gap-1.5 text-xs text-red-300">
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-red-300">
                   <AlertCircle size={13} className="shrink-0" aria-hidden="true" />
                   <span>{globalScoreNote}</span>
                 </p>
               )}
 
-              <div className="mt-6 flex w-full max-w-xs flex-col gap-2.5">
+              {/* Cambio rápido de dificultad antes de reintentar */}
+              <div className="mt-4 grid w-full max-w-xs grid-cols-4 gap-1.5">
+                {ARCADE_DIFFICULTY_PRESETS.map((preset) => {
+                  const active = selectedDifficultyId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setSelectedDifficultyId(preset.id)}
+                      className={`min-h-[38px] rounded-lg border px-1 py-1 text-[10px] font-bold transition-colors ${
+                        active
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)] text-white'
+                          : 'border-white/[0.08] bg-[#131823] text-[#8B95A5] hover:text-white'
+                      }`}
+                    >
+                      <div>{preset.label}</div>
+                      <div className="font-mono text-[9px] opacity-80">
+                        {preset.multiplierLabel}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
                 <button
                   type="button"
                   onClick={startNewRun}
-                  className="min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 text-sm font-bold text-[#06101F] hover:bg-[#529BFF] active:scale-[0.98] transition-all"
+                  className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 text-sm font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all"
                 >
                   <RotateCcw size={16} aria-hidden="true" />
-                  <span>Jugar de nuevo</span>
+                  <span>
+                    Jugar de nuevo ({selectedDifficulty.label})
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[46px] rounded-xl border border-white/[0.1] bg-[#121621] px-5 text-sm font-medium text-[#D5DCE6] hover:bg-[#191F2E] hover:text-white transition-colors"
+                  className="min-h-[44px] rounded-xl border border-white/[0.1] bg-[#121621] px-5 text-sm font-medium text-[#D5DCE6] hover:bg-[#191F2E] hover:text-white transition-colors"
                 >
                   Volver al Arcade
                 </button>

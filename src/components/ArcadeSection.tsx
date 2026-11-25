@@ -49,6 +49,7 @@ import {
   completeArcadeChallenge,
   createArcadeChallenge,
   fetchUserArcadeChallenges,
+  normalizeDuelGameId,
   type ArcadeChallengeRecord,
   type DuelGameId,
 } from '../lib/phase4';
@@ -92,7 +93,100 @@ function GamePreviewArtwork({ game }: { game: ArcadeGameConfig }) {
           <line x1="0" y1="135" x2="360" y2="135" />
         </g>
 
-        {game.engine === 'bastion' ? (
+        {game.engine === 'pulso' ? (
+          <>
+            <line x1="90" y1="0" x2="90" y2="180" stroke="rgba(255,255,255,0.12)" />
+            <line x1="180" y1="0" x2="180" y2="180" stroke="rgba(255,255,255,0.12)" />
+            <line x1="270" y1="0" x2="270" y2="180" stroke="rgba(255,255,255,0.12)" />
+            <line
+              x1="0"
+              y1="142"
+              x2="360"
+              y2="142"
+              stroke="var(--accent-primary)"
+              strokeWidth="3"
+              strokeOpacity="0.85"
+            />
+            <rect x="26" y="42" width="38" height="14" rx="7" fill="var(--accent-primary)" />
+            <rect x="116" y="88" width="38" height="14" rx="7" fill="#38BDF8" />
+            <rect x="206" y="54" width="38" height="14" rx="7" fill="#F59E0B" />
+            <rect x="296" y="106" width="38" height="14" rx="7" fill="#EC4899" />
+            <circle cx="135" cy="142" r="18" stroke="#38BDF8" strokeWidth="2" fill="none" opacity="0.6" />
+          </>
+        ) : game.engine === 'codice' ? (
+          <>
+            {[0, 1, 2, 3].map((col) =>
+              [0, 1, 2].map((row) => {
+                const isLit =
+                  (col === 0 && row === 1) ||
+                  (col === 1 && row === 1) ||
+                  (col === 1 && row === 0) ||
+                  (col === 2 && row === 0) ||
+                  (col === 2 && row === 1) ||
+                  (col === 3 && row === 1);
+                return (
+                  <rect
+                    key={`${col}-${row}`}
+                    x={86 + col * 48}
+                    y={30 + row * 42}
+                    width="38"
+                    height="34"
+                    rx="8"
+                    fill={isLit ? 'var(--accent-primary)' : '#141926'}
+                    fillOpacity={isLit ? 0.32 : 0.9}
+                    stroke={isLit ? 'var(--accent-primary)' : 'rgba(255,255,255,0.12)'}
+                    strokeWidth="2"
+                  />
+                );
+              })
+            )}
+            <path
+              d="M105 89H153V47H201V89H249"
+              stroke="#FFFFFF"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </>
+        ) : game.engine === 'salto' ? (
+          <>
+            <rect x="52" y="138" width="84" height="11" rx="5.5" fill="var(--accent-primary)" />
+            <rect x="196" y="106" width="76" height="11" rx="5.5" fill="#38BDF8" />
+            <rect x="98" y="70" width="70" height="11" rx="5.5" fill="#10B981" />
+            <rect x="220" y="38" width="66" height="11" rx="5.5" fill="#F59E0B" />
+            <circle cx="132" cy="48" r="13" fill="var(--accent-primary)" stroke="#FFFFFF" strokeWidth="2" />
+            <circle cx="282" cy="86" r="10" fill="#2A101B" stroke="#F43F5E" strokeWidth="2.2" />
+            <polygon points="232,88 238,94 232,100 226,94" fill="#FBBF24" />
+          </>
+        ) : game.engine === 'oraculo' ? (
+          <>
+            <circle
+              cx="112"
+              cy="90"
+              r="46"
+              fill="var(--accent-primary)"
+              fillOpacity="0.18"
+              stroke="var(--accent-primary)"
+              strokeWidth="2.5"
+            />
+            <text
+              x="112"
+              y="104"
+              textAnchor="middle"
+              fill="#FFFFFF"
+              fontSize="42"
+              fontWeight="800"
+              fontFamily="sans-serif"
+            >
+              ?
+            </text>
+            <rect x="184" y="42" width="136" height="20" rx="7" fill="#171E2E" stroke="rgba(255,255,255,0.14)" />
+            <rect x="184" y="72" width="136" height="20" rx="7" fill="#10B981" fillOpacity="0.24" stroke="#10B981" strokeWidth="1.8" />
+            <rect x="184" y="102" width="136" height="20" rx="7" fill="#171E2E" stroke="rgba(255,255,255,0.14)" />
+            <rect x="184" y="136" width="110" height="6" rx="3" fill="var(--accent-primary)" />
+          </>
+        ) : game.engine === 'bastion' ? (
           <>
             <line
               x1="20"
@@ -209,7 +303,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
   // Modal exclusivo del Dueño: crear desafío retro-fantasía con Gemini gratuito
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [promptInput, setPromptInput] = useState('');
-  const [selectedEngine, setSelectedEngine] = useState<ArcadeEngineId>('astral');
+  const [selectedEngine, setSelectedEngine] = useState<'astral' | 'bastion'>('astral');
   const [isGenerating, setIsGenerating] = useState(false);
   const [creatorError, setCreatorError] = useState<string | null>(null);
 
@@ -258,8 +352,9 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
   }
 
   function handleLaunchAcceptDuel(challenge: ArcadeChallengeRecord) {
+    const normalizedId = normalizeDuelGameId(challenge.game_id);
     const targetGame =
-      games.find((g) => g.id === challenge.game_id) ?? games[0] ?? null;
+      games.find((g) => g.id === normalizedId) ?? games[0] ?? null;
     if (!targetGame) return;
     setActiveDuel({ kind: 'accept', challenge });
     setActiveGame(targetGame);
@@ -736,25 +831,25 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
             </div>
           </div>
 
-          <ul className="mt-4 space-y-2">
-            {visibleGames.slice(0, 4).map((game) => {
+          <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            {visibleGames.slice(0, 6).map((game) => {
               const best = mergedHighScores[game.id] ?? 0;
               return (
                 <li
                   key={game.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-2.5 transition-colors"
+                  className="flex items-center justify-between gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 py-2 transition-colors"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-[var(--text-main)]">
                       {game.title}
                     </p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      {formatDifficultyLabel(game.difficulty)}
+                    <p className="truncate text-[10px] text-[var(--text-muted)]">
+                      {game.genre}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="font-display text-sm font-bold tabular-nums text-[var(--text-main)]">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-display text-xs font-bold tabular-nums text-[var(--text-main)]">
                       {best.toLocaleString('es-ES')}{' '}
                       <span className="text-[10px] font-normal text-[var(--text-muted)]">
                         pts
@@ -764,9 +859,9 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
                       type="button"
                       onClick={() => setActiveGame(game)}
                       aria-label={`Jugar ${game.title}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--accent-primary)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)] transition-colors"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--accent-primary)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)] transition-colors"
                     >
-                      <Play size={12} className="fill-current" aria-hidden="true" />
+                      <Play size={11} className="fill-current" aria-hidden="true" />
                     </button>
                   </div>
                 </li>

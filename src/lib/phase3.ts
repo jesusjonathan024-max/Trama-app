@@ -486,10 +486,18 @@ export async function fetchReadingHistoryCount(userId: string): Promise<number> 
 // 3. RETOS DIARIOS DE ARCADE (Rotación determinista por fecha actual)
 // =============================================================================
 
+export type DailyChallengeGameId =
+  | 'senda-astral'
+  | 'bastion-de-runas'
+  | 'pulso-neon'
+  | 'codice-runico'
+  | 'salto-vacio'
+  | 'oraculo-trama';
+
 export interface DailyArcadeChallenge {
   dateKey: string;
   dateLabel: string;
-  gameId: 'senda-astral' | 'bastion-de-runas';
+  gameId: DailyChallengeGameId;
   gameTitle: string;
   title: string;
   description: string;
@@ -497,7 +505,7 @@ export interface DailyArcadeChallenge {
 }
 
 const DAILY_CHALLENGE_POOL: ReadonlyArray<{
-  gameId: 'senda-astral' | 'bastion-de-runas';
+  gameId: DailyChallengeGameId;
   gameTitle: string;
   title: string;
   description: string;
@@ -507,43 +515,85 @@ const DAILY_CHALLENGE_POOL: ReadonlyArray<{
     gameId: 'senda-astral',
     gameTitle: 'Senda Astral',
     title: 'Vuelo sin rasguños',
-    description: 'Alcanza al menos 600 puntos en una partida de Senda Astral hoy.',
-    targetScore: 600,
+    description: 'Alcanza al menos 650 puntos en una partida de Senda Astral hoy.',
+    targetScore: 650,
+  },
+  {
+    gameId: 'pulso-neon',
+    gameTitle: 'Pulso Neón',
+    title: 'Frecuencia Perfecta',
+    description: 'Mantén el ritmo y supera los 1,200 puntos en Pulso Neón hoy.',
+    targetScore: 1200,
   },
   {
     gameId: 'bastion-de-runas',
     gameTitle: 'Bastión de Runas',
     title: 'Guardián del Bastión',
-    description: 'Supera los 750 puntos defendiendo la arena en Bastión de Runas hoy.',
-    targetScore: 750,
+    description: 'Supera los 800 puntos defendiendo la arena en Bastión de Runas hoy.',
+    targetScore: 800,
+  },
+  {
+    gameId: 'codice-runico',
+    gameTitle: 'Códice Rúnico',
+    title: 'Memoria Arcana',
+    description: 'Reproduce secuencias rúnicas hasta superar los 700 puntos en Códice Rúnico hoy.',
+    targetScore: 700,
+  },
+  {
+    gameId: 'salto-vacio',
+    gameTitle: 'Salto del Vacío',
+    title: 'Ascenso sin Límites',
+    description: 'Escala las plataformas hasta lograr 900 puntos en Salto del Vacío hoy.',
+    targetScore: 900,
+  },
+  {
+    gameId: 'oraculo-trama',
+    gameTitle: 'Oráculo de Trama',
+    title: 'Mente Relámpago',
+    description: 'Encadena respuestas correctas y alcanza 1,000 puntos en Oráculo de Trama hoy.',
+    targetScore: 1000,
   },
   {
     gameId: 'senda-astral',
     gameTitle: 'Senda Astral',
     title: 'Cazador de Reliquias',
-    description: 'Encadena runas hasta llegar a 950 puntos en Senda Astral hoy.',
-    targetScore: 950,
+    description: 'Encadena runas hasta llegar a 1,000 puntos en Senda Astral hoy.',
+    targetScore: 1000,
   },
   {
-    gameId: 'bastion-de-runas',
-    gameTitle: 'Bastión de Runas',
-    title: 'Pulso Arcano',
-    description: 'Derrota oleadas hasta alcanzar 1,100 puntos en Bastión de Runas hoy.',
+    gameId: 'pulso-neon',
+    gameTitle: 'Pulso Neón',
+    title: 'Pulso Imparable',
+    description: 'Domina las ondas dobles y consigue 1,800 puntos en Pulso Neón hoy.',
+    targetScore: 1800,
+  },
+  {
+    gameId: 'codice-runico',
+    gameTitle: 'Códice Rúnico',
+    title: 'Maestro del Códice',
+    description: 'Supera rondas avanzadas para lograr 1,100 puntos en Códice Rúnico hoy.',
     targetScore: 1100,
   },
   {
-    gameId: 'senda-astral',
-    gameTitle: 'Senda Astral',
-    title: 'Dominio del Vacío',
-    description: 'Consigue 1,250 puntos en una sola sesión de Senda Astral hoy.',
-    targetScore: 1250,
+    gameId: 'salto-vacio',
+    gameTitle: 'Salto del Vacío',
+    title: 'Cima del Abismo',
+    description: 'Supera los 1,350 puntos en una sola escalada de Salto del Vacío hoy.',
+    targetScore: 1350,
+  },
+  {
+    gameId: 'oraculo-trama',
+    gameTitle: 'Oráculo de Trama',
+    title: 'Sabiduría de Trama',
+    description: 'Supera los 1,450 puntos en Trivia Relámpago de Oráculo de Trama hoy.',
+    targetScore: 1450,
   },
   {
     gameId: 'bastion-de-runas',
     gameTitle: 'Bastión de Runas',
     title: 'Centinela Imparable',
-    description: 'Logra 1,400 puntos enfrentando a la legión en Bastión de Runas hoy.',
-    targetScore: 1400,
+    description: 'Logra 1,300 puntos enfrentando a la legión en Bastión de Runas hoy.',
+    targetScore: 1300,
   },
 ];
 

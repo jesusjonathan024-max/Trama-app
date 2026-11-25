@@ -1,8 +1,112 @@
 import type { AiArcadeChallenge } from './ai';
 import { supabase } from './supabase';
 
-export type ArcadeEngineId = 'astral' | 'bastion';
+export type ArcadeEngineId =
+  | 'astral'
+  | 'bastion'
+  | 'pulso'
+  | 'codice'
+  | 'salto'
+  | 'oraculo';
+
 export type ArcadeDifficulty = 'normal' | 'dificil' | 'extremo';
+
+export type ArcadePlayDifficulty =
+  | 'facil'
+  | 'normal'
+  | 'dificil'
+  | 'pesadilla';
+
+export interface DifficultyPreset {
+  id: ArcadePlayDifficulty;
+  label: string;
+  multiplierLabel: string;
+  scoreMultiplier: number;
+  speedScale: number;
+  spawnScale: number;
+  damageScale: number;
+  maxLives: number;
+  summary: string;
+  triviaSeconds: number;
+  triviaWrongPenalty: number;
+  codiceGridSize: 4 | 5 | 6;
+}
+
+export const ARCADE_DIFFICULTY_PRESETS: readonly DifficultyPreset[] = [
+  {
+    id: 'facil',
+    label: 'Fácil',
+    multiplierLabel: '×0.8',
+    scoreMultiplier: 0.8,
+    speedScale: 0.75,
+    spawnScale: 0.75,
+    damageScale: 1,
+    maxLives: 4,
+    summary: 'Velocidad y obstáculos al 75%, mayor margen de vida y tiempo.',
+    triviaSeconds: 15,
+    triviaWrongPenalty: 0,
+    codiceGridSize: 4,
+  },
+  {
+    id: 'normal',
+    label: 'Normal',
+    multiplierLabel: '×1.0',
+    scoreMultiplier: 1.0,
+    speedScale: 1.0,
+    spawnScale: 1.0,
+    damageScale: 1,
+    maxLives: 3,
+    summary: 'Balance estándar de velocidad, frecuencia y puntuación.',
+    triviaSeconds: 10,
+    triviaWrongPenalty: 0,
+    codiceGridSize: 5,
+  },
+  {
+    id: 'dificil',
+    label: 'Difícil',
+    multiplierLabel: '×1.5',
+    scoreMultiplier: 1.5,
+    speedScale: 1.35,
+    spawnScale: 1.3,
+    damageScale: 1,
+    maxLives: 3,
+    summary: 'Ritmo 35% más rápido, patrones complejos y menos margen de error.',
+    triviaSeconds: 7,
+    triviaWrongPenalty: 50,
+    codiceGridSize: 5,
+  },
+  {
+    id: 'pesadilla',
+    label: 'Pesadilla',
+    multiplierLabel: '×2.0',
+    scoreMultiplier: 2.0,
+    speedScale: 1.6,
+    spawnScale: 1.55,
+    damageScale: 2,
+    maxLives: 3,
+    summary: 'Velocidad máxima, aparición intensa y daño doble.',
+    triviaSeconds: 5,
+    triviaWrongPenalty: 100,
+    codiceGridSize: 6,
+  },
+];
+
+export function getDifficultyPreset(
+  id: ArcadePlayDifficulty
+): DifficultyPreset {
+  return (
+    ARCADE_DIFFICULTY_PRESETS.find((preset) => preset.id === id) ??
+    ARCADE_DIFFICULTY_PRESETS[1]
+  );
+}
+
+export function applyDifficultyScore(
+  rawScore: number,
+  difficulty: DifficultyPreset
+): number {
+  const clean = Math.max(0, Math.floor(rawScore));
+  return Math.max(0, Math.round(clean * difficulty.scoreMultiplier));
+}
 
 export interface ArcadeGamePalette {
   bg: string;
@@ -83,6 +187,102 @@ export const BUILTIN_ARCADE_GAMES: ArcadeGameConfig[] = [
     isFeatured: false,
     isHidden: false,
     createdAt: '2026-01-02T00:00:00.000Z',
+  },
+  {
+    id: 'pulso-neon',
+    title: 'Pulso Neón',
+    subtitle: 'Ritmo de 4 carriles con ondas de energía y combos',
+    lore: 'Sincroniza tus reflejos con las ondas luminosas que descienden por 4 carriles hacia la línea de impacto. Encadena golpes Perfectos para multiplicar tu puntuación al máximo.',
+    genre: 'Ritmo · Reflejos',
+    engine: 'pulso',
+    difficulty: 'normal',
+    controlsHint: 'Toca cada carril en celular · Teclas D, F, J, K o 1, 2, 3, 4 en PC',
+    palette: {
+      bg: '#090C14',
+      primary: '#3B82F6',
+      accent: '#38BDF8',
+      danger: '#F43F5E',
+    },
+    speedMultiplier: 1,
+    spawnMultiplier: 1,
+    playerTitle: 'Sincronizador',
+    enemyTitle: 'Ondas de Pulso',
+    isBuiltIn: true,
+    isFeatured: false,
+    isHidden: false,
+    createdAt: '2026-01-03T00:00:00.000Z',
+  },
+  {
+    id: 'codice-runico',
+    title: 'Códice Rúnico',
+    subtitle: 'Memoriza y traza rutas arcanas contrarreloj',
+    lore: 'Observa el patrón de runas iluminadas en el tablero táctico y reprodúcelo en el orden exacto antes de que se agote el reloj. Cada ronda amplía la secuencia y exige mayor precisión.',
+    genre: 'Puzle · Memoria',
+    engine: 'codice',
+    difficulty: 'normal',
+    controlsHint: 'Toca o haz clic en las runas siguiendo el orden iluminado',
+    palette: {
+      bg: '#0A0D16',
+      primary: '#8B5CF6',
+      accent: '#34D399',
+      danger: '#FB7185',
+    },
+    speedMultiplier: 1,
+    spawnMultiplier: 1,
+    playerTitle: 'Archivista',
+    enemyTitle: 'Sellos del Códice',
+    isBuiltIn: true,
+    isFeatured: false,
+    isHidden: false,
+    createdAt: '2026-01-04T00:00:00.000Z',
+  },
+  {
+    id: 'salto-vacio',
+    title: 'Salto del Vacío',
+    subtitle: 'Escalada vertical infinita entre plataformas y abismos',
+    lore: 'Asciende sin descanso saltando entre plataformas sólidas, móviles y cristal frágil mientras esquivas zonas corruptas y el vacío ascendente. Usa el impulso aéreo para salvarte en el último instante.',
+    genre: 'Plataformas · Vertical',
+    engine: 'salto',
+    difficulty: 'normal',
+    controlsHint: 'Arrastra lateralmente en celular · A/D o ←/→ + Espacio en PC',
+    palette: {
+      bg: '#080B13',
+      primary: '#3B82F6',
+      accent: '#10B981',
+      danger: '#F43F5E',
+    },
+    speedMultiplier: 1,
+    spawnMultiplier: 1,
+    playerTitle: 'Viajero del Vacío',
+    enemyTitle: 'Grietas Corruptas',
+    isBuiltIn: true,
+    isFeatured: false,
+    isHidden: false,
+    createdAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'oraculo-trama',
+    title: 'Oráculo de Trama',
+    subtitle: 'Trivia relámpago de cultura, videojuegos, anime y ciencia',
+    lore: 'Pon a prueba tu agilidad mental con más de 60 preguntas de cultura general, videojuegos, anime, literatura, ciencia y tecnología bajo barra de tiempo regresivo y multiplicador por racha.',
+    genre: 'Trivia · Relámpago',
+    engine: 'oraculo',
+    difficulty: 'normal',
+    controlsHint: 'Toca la respuesta correcta o presiona las teclas 1, 2, 3 o 4',
+    palette: {
+      bg: '#0A0D14',
+      primary: '#8B5CF6',
+      accent: '#F59E0B',
+      danger: '#EF4444',
+    },
+    speedMultiplier: 1,
+    spawnMultiplier: 1,
+    playerTitle: 'Erudito',
+    enemyTitle: 'Reloj del Oráculo',
+    isBuiltIn: true,
+    isFeatured: false,
+    isHidden: false,
+    createdAt: '2026-01-06T00:00:00.000Z',
   },
 ];
 

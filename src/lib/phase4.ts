@@ -447,7 +447,11 @@ export async function fetchRegisteredUsersDirectory(
 
 export const DUEL_SUPPORTED_GAMES = [
   { id: 'senda-astral', title: 'Senda Astral' },
-  { id: 'bastion-runas', title: 'Bastión de Runas' },
+  { id: 'bastion-de-runas', title: 'Bastión de Runas' },
+  { id: 'pulso-neon', title: 'Pulso Neón' },
+  { id: 'codice-runico', title: 'Códice Rúnico' },
+  { id: 'salto-vacio', title: 'Salto del Vacío' },
+  { id: 'oraculo-trama', title: 'Oráculo de Trama' },
 ] as const;
 
 export type DuelGameId = (typeof DUEL_SUPPORTED_GAMES)[number]['id'];
@@ -476,8 +480,14 @@ interface RawChallengeRow {
   created_at: string;
 }
 
+export function normalizeDuelGameId(gameId: string): string {
+  if (gameId === 'bastion-runas') return 'bastion-de-runas';
+  return gameId;
+}
+
 export function getDuelGameTitle(gameId: string): string {
-  const found = DUEL_SUPPORTED_GAMES.find((g) => g.id === gameId);
+  const normalized = normalizeDuelGameId(gameId);
+  const found = DUEL_SUPPORTED_GAMES.find((g) => g.id === normalized);
   return found ? found.title : gameId;
 }
 

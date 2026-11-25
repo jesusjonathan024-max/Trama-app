@@ -124,7 +124,7 @@ export function ArcadeChallengesPanel({
           Retos 1v1 entre Amigos
         </h2>
         <p className="mx-auto mt-1.5 max-w-md text-sm text-[var(--text-secondary)]">
-          Inicia sesión para desafiar a otros jugadores de Trama en Senda Astral o Bastión de Runas y aceptar duelos pendientes.
+          Inicia sesión para desafiar a otros jugadores de Trama en cualquiera de los 6 juegos oficiales del Arcade y aceptar duelos pendientes.
         </p>
         <button
           type="button"
@@ -180,7 +180,7 @@ export function ArcadeChallengesPanel({
                     type="button"
                     onClick={() => setSelectedGameId(g.id)}
                     aria-pressed={active}
-                    className={`min-h-[42px] rounded-xl border px-3 text-xs font-semibold transition-colors ${
+                    className={`min-h-[42px] truncate rounded-xl border px-2.5 text-xs font-semibold transition-colors ${
                       active
                         ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
                         : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
@@ -349,7 +349,7 @@ export function ArcadeChallengesPanel({
                     No tienes retos pendientes
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                    Cuando alguien te rete en Senda Astral o Bastión de Runas aparecerá aquí listo para jugar.
+                    Cuando alguien te rete en cualquier juego del Arcade aparecerá aquí listo para jugar.
                   </p>
                 </div>
               ) : (
