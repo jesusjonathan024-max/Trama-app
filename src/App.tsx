@@ -22,7 +22,7 @@ import { AchievementProvider } from './context/AchievementContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocialProvider, useSocial } from './context/SocialContext';
 import { ThemeProvider } from './context/ThemeContext';
-import type { AiChatContext } from './lib/ai';
+import { ENABLE_AI_FEATURES, type AiChatContext } from './lib/ai';
 import {
   fetchChaptersBySeries,
   type ChapterRecord,
@@ -133,6 +133,7 @@ function AppShell() {
   );
 
   const openSectionAssistant = useCallback((section: 'actualidad' | 'comunidad') => {
+    if (!ENABLE_AI_FEATURES) return;
     setAiContext({ section });
     setAiInitialPrompt(null);
     setIsAiDrawerOpen(true);
@@ -140,6 +141,7 @@ function AppShell() {
 
   const openPostAssistant = useCallback(
     (post: PostRecord, initialPrompt?: string) => {
+      if (!ENABLE_AI_FEATURES) return;
       setAiContext({
         section: post.mode,
         title: post.title,
@@ -519,14 +521,16 @@ function AppShell() {
         onUnreadChanged={() => void refreshUnreadDms()}
       />
 
-      <AiAssistantDrawer
-        isOpen={isAiDrawerOpen}
-        onClose={() => setIsAiDrawerOpen(false)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        context={aiContext}
-        initialPrompt={aiInitialPrompt}
-        onClearInitialPrompt={() => setAiInitialPrompt(null)}
-      />
+      {ENABLE_AI_FEATURES && (
+        <AiAssistantDrawer
+          isOpen={isAiDrawerOpen}
+          onClose={() => setIsAiDrawerOpen(false)}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          context={aiContext}
+          initialPrompt={aiInitialPrompt}
+          onClearInitialPrompt={() => setAiInitialPrompt(null)}
+        />
+      )}
 
       <AuthModal
         isOpen={isAuthModalOpen}

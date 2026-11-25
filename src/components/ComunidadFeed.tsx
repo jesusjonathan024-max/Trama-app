@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
+import { ENABLE_AI_FEATURES } from '../lib/ai';
 import {
   formatHashtagDisplay,
   getPopularHashtags,
@@ -421,14 +422,16 @@ export function ComunidadFeed({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={onOpenAssistant}
-              className="min-h-[40px] inline-flex items-center gap-2 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            >
-              <Sparkles size={15} aria-hidden="true" />
-              <span>Asistente IA</span>
-            </button>
+            {ENABLE_AI_FEATURES && (
+              <button
+                type="button"
+                onClick={onOpenAssistant}
+                className="min-h-[40px] inline-flex items-center gap-2 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                <span>Asistente IA</span>
+              </button>
+            )}
           </div>
 
           {/* Selector superior de Grupos / Sub-comunidades */}

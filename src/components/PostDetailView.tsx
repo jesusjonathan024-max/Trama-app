@@ -23,7 +23,7 @@ import {
 import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
-import { summarizeArticleExecutive } from '../lib/ai';
+import { ENABLE_AI_FEATURES, summarizeArticleExecutive } from '../lib/ai';
 import { fetchUserReportedPostIds } from '../lib/phase2';
 import {
   fetchPollForPost,
@@ -535,49 +535,51 @@ export function PostDetailView({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleGenerateExecutiveSummary()}
-                disabled={isSummarizing}
-                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] disabled:opacity-60 transition-colors duration-300"
-              >
-                {isSummarizing ? (
-                  <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <Sparkles size={14} aria-hidden="true" />
-                )}
-                <span>
-                  {isSummarizing
-                    ? 'Resumiendo…'
-                    : aiSummaryText
-                      ? 'Actualizar resumen IA'
-                      : 'Resumir con IA'}
-                </span>
-              </button>
+            {ENABLE_AI_FEATURES && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateExecutiveSummary()}
+                  disabled={isSummarizing}
+                  className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] disabled:opacity-60 transition-colors duration-300"
+                >
+                  {isSummarizing ? (
+                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Sparkles size={14} aria-hidden="true" />
+                  )}
+                  <span>
+                    {isSummarizing
+                      ? 'Resumiendo…'
+                      : aiSummaryText
+                        ? 'Actualizar resumen IA'
+                        : 'Resumir con IA'}
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  onOpenAssistant(
-                    post,
-                    'Verifica en Google los datos, cifras o hechos más recientes mencionados en este artículo.'
-                  )
-                }
-                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors duration-300"
-              >
-                <Globe
-                  size={14}
-                  className="text-[var(--accent-primary)]"
-                  aria-hidden="true"
-                />
-                <span>Verificar datos</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenAssistant(
+                      post,
+                      'Verifica en Google los datos, cifras o hechos más recientes mencionados en este artículo.'
+                    )
+                  }
+                  className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors duration-300"
+                >
+                  <Globe
+                    size={14}
+                    className="text-[var(--accent-primary)]"
+                    aria-hidden="true"
+                  />
+                  <span>Verificar datos</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Tarjeta de Resumen Ejecutivo IA (3 puntos clave) */}
-          {(isSummarizing || aiSummaryText || summaryError) && (
+          {ENABLE_AI_FEATURES && (isSummarizing || aiSummaryText || summaryError) && (
             <div className="mt-6 rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4 sm:p-5 transition-colors duration-300">
               <div className="flex items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)]">
@@ -914,14 +916,16 @@ export function PostDetailView({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => onOpenAssistant(post)}
-                className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
-              >
-                <Sparkles size={14} aria-hidden="true" />
-                <span>Consultar / Verificar con IA</span>
-              </button>
+              {ENABLE_AI_FEATURES && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAssistant(post)}
+                  className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
+                >
+                  <Sparkles size={14} aria-hidden="true" />
+                  <span>Consultar / Verificar con IA</span>
+                </button>
+              )}
             </div>
           </div>
         </article>

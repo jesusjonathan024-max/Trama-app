@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { generateAiArcadeChallenge } from '../lib/ai';
+import { ENABLE_AI_FEATURES, generateAiArcadeChallenge } from '../lib/ai';
 import {
   addCustomArcadeChallenge,
   deleteArcadeScore,
@@ -521,7 +521,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
           </p>
         </div>
 
-        {isOwner && (
+        {ENABLE_AI_FEATURES && isOwner && (
           <button
             type="button"
             onClick={() => {
@@ -1259,7 +1259,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
       />
 
       {/* Modal exclusivo del Dueño: generar desafío con Gemini gratuito */}
-      {isOwner && isCreatorOpen && (
+      {ENABLE_AI_FEATURES && isOwner && isCreatorOpen && (
         <div
           role="dialog"
           aria-modal="true"

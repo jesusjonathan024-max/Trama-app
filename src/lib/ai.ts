@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+// Bandera global para activar o desactivar temporalmente las funciones visuales de IA
+export const ENABLE_AI_FEATURES = false;
+
 export const MAX_AI_PROMPT_LENGTH = 2000;
 
 export interface AiChatTurn {
