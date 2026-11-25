@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase, type UserProfile } from '../lib/supabase';
+import { isOwnerRole, supabase, type UserProfile } from '../lib/supabase';
 
 interface AuthContextValue {
   session: Session | null;
@@ -18,6 +18,7 @@ interface AuthContextValue {
   isLoadingSession: boolean;
   isLoadingProfile: boolean;
   isAuthenticated: boolean;
+  isOwner: boolean;
   refreshProfile: () => Promise<void>;
   setProfileState: (nextProfile: UserProfile, exists?: boolean) => void;
   signOut: () => Promise<{ error: string | null }>;
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, bio, avatar_url')
+        .select('id, username, bio, avatar_url, role')
         .eq('id', userId)
         .maybeSingle();
 
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: null,
           bio: null,
           avatar_url: null,
+          role: null,
         });
         setProfileExists(false);
         return;
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data.username ?? null,
           bio: data.bio ?? null,
           avatar_url: data.avatar_url ?? null,
+          role: data.role ?? null,
         });
         setProfileExists(true);
       } else {
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: null,
           bio: null,
           avatar_url: null,
+          role: null,
         });
         setProfileExists(false);
       }
@@ -79,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: null,
         bio: null,
         avatar_url: null,
+        role: null,
       });
       setProfileExists(false);
     } finally {
@@ -161,6 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, []);
 
+  const isOwner = isOwnerRole(profile?.role);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -170,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoadingSession,
       isLoadingProfile,
       isAuthenticated: Boolean(session?.user),
+      isOwner,
       refreshProfile,
       setProfileState,
       signOut,
@@ -181,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileExists,
       isLoadingSession,
       isLoadingProfile,
+      isOwner,
       refreshProfile,
       setProfileState,
       signOut,

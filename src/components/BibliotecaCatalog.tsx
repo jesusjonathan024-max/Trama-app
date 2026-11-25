@@ -13,6 +13,8 @@ import {
   type SeriesType,
 } from '../lib/library';
 import { MediaImage } from './MediaImage';
+import { OwnerBadge } from './OwnerBadge';
+import { getAuthorDisplayName } from '../lib/posts';
 
 export type BibliotecaFilter = 'todas' | SeriesType;
 
@@ -325,14 +327,25 @@ export function BibliotecaCatalog({
                   </div>
                 </div>
 
-                {/* Título y género debajo de la portada */}
+                {/* Título, género y autor debajo de la portada */}
                 <div className="mt-2.5 px-0.5">
                   <h2 className="line-clamp-2 font-display text-[15px] font-semibold leading-snug text-[#F3F5FA] group-hover:text-[#9CC6FF] transition-colors sm:text-base">
                     {series.title}
                   </h2>
-                  <p className="mt-1 truncate text-xs text-[#838D9F]">
-                    {series.genre}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[#838D9F]">
+                    <span className="truncate">{series.genre}</span>
+                    {series.author && (
+                      <>
+                        <span aria-hidden="true" className="text-[#566072]">
+                          ·
+                        </span>
+                        <span className="truncate max-w-[110px]">
+                          {getAuthorDisplayName(series.author)}
+                        </span>
+                        <OwnerBadge role={series.author.role} size="xs" />
+                      </>
+                    )}
+                  </div>
                 </div>
               </button>
             );

@@ -5,7 +5,11 @@ import {
   MessageSquare,
   Newspaper,
   PenSquare,
+  Pencil,
+  Pin,
+  PinOff,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,11 +19,15 @@ import {
   fetchPostsByMode,
   formatEditorialDate,
   getAuthorDisplayName,
+  sortPostsWithPinnedFirst,
   togglePostLike,
+  togglePostPin,
   type PostRecord,
 } from '../lib/posts';
 import { Avatar } from './Avatar';
+import { EditPostModal } from './EditPostModal';
 import { MediaImage } from './MediaImage';
+import { OwnerBadge } from './OwnerBadge';
 
 interface ActualidadFeedProps {
   selectedCategory: string;
@@ -44,13 +52,16 @@ export function ActualidadFeed({
   onOpenAuth,
   onOpenCreate,
 }: ActualidadFeedProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isOwner } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
+  const [pinningIds, setPinningIds] = useState<Record<string, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingPost, setEditingPost] = useState<PostRecord | null>(null);
 
   const loadArticles = useCallback(async () => {
     setIsLoading(true);
@@ -76,8 +87,10 @@ export function ActualidadFeed({
   useEffect(() => {
     if (!syncedPostUpdate || syncedPostUpdate.mode !== 'actualidad') return;
     setPosts((prev) =>
-      prev.map((item) =>
-        item.id === syncedPostUpdate.id ? syncedPostUpdate : item
+      sortPostsWithPinnedFirst(
+        prev.map((item) =>
+          item.id === syncedPostUpdate.id ? syncedPostUpdate : item
+        )
       )
     );
   }, [syncedPostUpdate]);
@@ -88,8 +101,11 @@ export function ActualidadFeed({
   }, [deletedPostId]);
 
   const filteredPosts = useMemo(() => {
-    if (selectedCategory === 'Todas') return posts;
-    return posts.filter((post) => post.category === selectedCategory);
+    const base =
+      selectedCategory === 'Todas'
+        ? posts
+        : posts.filter((post) => post.category === selectedCategory);
+    return sortPostsWithPinnedFirst(base);
   }, [posts, selectedCategory]);
 
   const leadArticle = filteredPosts[0] ?? null;
@@ -133,15 +149,52 @@ export function ActualidadFeed({
     }
   }
 
+  async function handleTogglePin(post: PostRecord) {
+    if (!isOwner || pinningIds[post.id]) return;
+    setActionError(null);
+    const nextPinned = !post.is_pinned;
+
+    setPinningIds((prev) => ({ ...prev, [post.id]: true }));
+    setPosts((prev) =>
+      sortPostsWithPinnedFirst(
+        prev.map((item) =>
+          item.id === post.id ? { ...item, is_pinned: nextPinned } : item
+        )
+      )
+    );
+
+    try {
+      await togglePostPin(post.id, nextPinned);
+    } catch (err) {
+      setPosts((prev) =>
+        sortPostsWithPinnedFirst(
+          prev.map((item) =>
+            item.id === post.id
+              ? { ...item, is_pinned: post.is_pinned }
+              : item
+          )
+        )
+      );
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cambiar el estado de fijado.'
+      );
+    } finally {
+      setPinningIds((prev) => ({ ...prev, [post.id]: false }));
+    }
+  }
+
   async function handleConfirmDelete(postId: string) {
     if (!user) return;
     setDeletingId(postId);
+    setActionError(null);
     try {
-      await deletePost(postId, user.id);
+      await deletePost(postId, user.id, isOwner);
       setPosts((prev) => prev.filter((item) => item.id !== postId));
       setConfirmDeleteId(null);
     } catch (err) {
-      setErrorMsg(
+      setActionError(
         err instanceof Error
           ? err.message
           : 'No se pudo eliminar el artículo.'
@@ -149,6 +202,14 @@ export function ActualidadFeed({
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function handleEditedSaved(updated: PostRecord) {
+    setPosts((prev) =>
+      sortPostsWithPinnedFirst(
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      )
+    );
   }
 
   return (
@@ -198,6 +259,30 @@ export function ActualidadFeed({
           </div>
         </div>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="mt-5 flex items-start justify-between gap-3 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-100"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle
+              size={18}
+              className="mt-0.5 shrink-0 text-red-400"
+              aria-hidden="true"
+            />
+            <span>{actionError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="Cerrar aviso"
+            className="shrink-0 rounded-lg p-1 text-red-200 hover:bg-white/10"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {/* Contenido principal */}
       {isLoading ? (
@@ -286,7 +371,11 @@ export function ActualidadFeed({
         <div className="mt-8">
           {/* Portada destacada superior */}
           <article
-            className={`group rounded-2xl border border-white/[0.08] bg-[#11151D] overflow-hidden transition-colors hover:border-white/[0.15] ${
+            className={`group rounded-2xl border bg-[#11151D] overflow-hidden transition-colors ${
+              leadArticle.is_pinned
+                ? 'border-amber-400/35 hover:border-amber-400/50'
+                : 'border-white/[0.08] hover:border-white/[0.15]'
+            } ${
               leadArticle.image_url
                 ? 'grid grid-cols-1 lg:grid-cols-12 items-stretch'
                 : 'p-6 sm:p-9'
@@ -314,6 +403,17 @@ export function ActualidadFeed({
             >
               <div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  {leadArticle.is_pinned && (
+                    <>
+                      <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+                        <Pin size={12} aria-hidden="true" />
+                        <span>Fijado</span>
+                      </span>
+                      <span aria-hidden="true" className="text-[#566072]">
+                        ·
+                      </span>
+                    </>
+                  )}
                   <span className="font-semibold text-[#7FB2FF]">
                     {leadArticle.category}
                   </span>
@@ -349,18 +449,19 @@ export function ActualidadFeed({
               </div>
 
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-4">
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex min-w-0 items-center gap-2">
                   <Avatar
                     src={leadArticle.author?.avatar_url}
                     name={leadArticle.author?.username}
                     size="sm"
                   />
-                  <span className="truncate text-xs font-medium text-[#D8DEE9] max-w-[160px]">
+                  <span className="truncate text-xs font-medium text-[#D8DEE9] max-w-[140px]">
                     {getAuthorDisplayName(leadArticle.author)}
                   </span>
+                  <OwnerBadge role={leadArticle.author?.role} size="xs" />
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <button
                     type="button"
                     onClick={() => void handleToggleLike(leadArticle)}
@@ -397,11 +498,53 @@ export function ActualidadFeed({
                     </span>
                   </button>
 
-                  {user?.id === leadArticle.author_id &&
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => void handleTogglePin(leadArticle)}
+                      disabled={Boolean(pinningIds[leadArticle.id])}
+                      title={
+                        leadArticle.is_pinned
+                          ? 'Quitar fijado'
+                          : 'Fijar arriba de Actualidad'
+                      }
+                      aria-label={
+                        leadArticle.is_pinned
+                          ? 'Quitar fijado'
+                          : 'Fijar artículo'
+                      }
+                      className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                        leadArticle.is_pinned
+                          ? 'text-amber-300 bg-amber-400/12 hover:bg-amber-400/20'
+                          : 'text-[#8F99AB] hover:bg-white/[0.05] hover:text-amber-300'
+                      }`}
+                    >
+                      {leadArticle.is_pinned ? (
+                        <PinOff size={15} aria-hidden="true" />
+                      ) : (
+                        <Pin size={15} aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
+
+                  {(isOwner || user?.id === leadArticle.author_id) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingPost(leadArticle)}
+                      title="Editar artículo"
+                      aria-label="Editar artículo"
+                      className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg text-[#8F99AB] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                    </button>
+                  )}
+
+                  {(isOwner || user?.id === leadArticle.author_id) &&
                     confirmDeleteId !== leadArticle.id && (
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(leadArticle.id)}
+                        title="Eliminar artículo"
                         aria-label="Eliminar artículo"
                         className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg text-[#7E889B] hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
                       >
@@ -438,15 +581,25 @@ export function ActualidadFeed({
           {editorialList.length > 0 && (
             <div className="mt-10 divide-y divide-white/[0.08] border-t border-white/[0.08]">
               {editorialList.map((article) => {
-                const isOwner = Boolean(user && user.id === article.author_id);
+                const canModerate = Boolean(
+                  isOwner || (user && user.id === article.author_id)
+                );
                 return (
-                  <article
-                    key={article.id}
-                    className="group py-7 first:pt-8"
-                  >
+                  <article key={article.id} className="group py-7 first:pt-8">
                     <div className="flex flex-col-reverse gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          {article.is_pinned && (
+                            <>
+                              <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+                                <Pin size={12} aria-hidden="true" />
+                                <span>Fijado</span>
+                              </span>
+                              <span aria-hidden="true" className="text-[#566072]">
+                                ·
+                              </span>
+                            </>
+                          )}
                           <span className="font-semibold text-[#7FB2FF]">
                             {article.category}
                           </span>
@@ -481,18 +634,19 @@ export function ActualidadFeed({
                         </button>
 
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-2.5">
+                          <div className="flex min-w-0 items-center gap-2">
                             <Avatar
                               src={article.author?.avatar_url}
                               name={article.author?.username}
                               size="sm"
                             />
-                            <span className="truncate text-xs font-medium text-[#D2D9E5] max-w-[180px]">
+                            <span className="truncate text-xs font-medium text-[#D2D9E5] max-w-[160px]">
                               {getAuthorDisplayName(article.author)}
                             </span>
+                            <OwnerBadge role={article.author?.role} size="xs" />
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() => void handleToggleLike(article)}
@@ -531,10 +685,52 @@ export function ActualidadFeed({
                               </span>
                             </button>
 
-                            {isOwner && confirmDeleteId !== article.id && (
+                            {isOwner && (
+                              <button
+                                type="button"
+                                onClick={() => void handleTogglePin(article)}
+                                disabled={Boolean(pinningIds[article.id])}
+                                title={
+                                  article.is_pinned
+                                    ? 'Quitar fijado'
+                                    : 'Fijar arriba de Actualidad'
+                                }
+                                aria-label={
+                                  article.is_pinned
+                                    ? 'Quitar fijado'
+                                    : 'Fijar artículo'
+                                }
+                                className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                                  article.is_pinned
+                                    ? 'text-amber-300 bg-amber-400/12 hover:bg-amber-400/20'
+                                    : 'text-[#8F99AB] hover:bg-white/[0.05] hover:text-amber-300'
+                                }`}
+                              >
+                                {article.is_pinned ? (
+                                  <PinOff size={15} aria-hidden="true" />
+                                ) : (
+                                  <Pin size={15} aria-hidden="true" />
+                                )}
+                              </button>
+                            )}
+
+                            {canModerate && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingPost(article)}
+                                title="Editar artículo"
+                                aria-label="Editar artículo"
+                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg text-[#8F99AB] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                              >
+                                <Pencil size={15} aria-hidden="true" />
+                              </button>
+                            )}
+
+                            {canModerate && confirmDeleteId !== article.id && (
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(article.id)}
+                                title="Eliminar artículo"
                                 aria-label="Eliminar artículo"
                                 className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-lg text-[#7E889B] hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
                               >
@@ -552,7 +748,9 @@ export function ActualidadFeed({
                             <button
                               type="button"
                               disabled={deletingId === article.id}
-                              onClick={() => void handleConfirmDelete(article.id)}
+                              onClick={() =>
+                                void handleConfirmDelete(article.id)
+                              }
                               className="min-h-[34px] rounded-lg bg-red-500/20 px-3 font-medium text-red-200 hover:bg-red-500/30 disabled:opacity-50"
                             >
                               {deletingId === article.id
@@ -592,6 +790,12 @@ export function ActualidadFeed({
           )}
         </div>
       )}
+
+      <EditPostModal
+        post={editingPost}
+        onClose={() => setEditingPost(null)}
+        onSaved={handleEditedSaved}
+      />
     </section>
   );
 }

@@ -29,6 +29,7 @@ export interface PostAuthor {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  role?: string | null;
 }
 
 export interface PostRecord {
@@ -39,6 +40,7 @@ export interface PostRecord {
   title: string | null;
   content: string;
   image_url: string | null;
+  is_pinned: boolean;
   created_at: string;
   author: PostAuthor | null;
   likes_count: number;
@@ -60,6 +62,12 @@ export interface CommentNode extends CommentRecord {
   replies: CommentNode[];
 }
 
+export interface OwnerPlatformStats {
+  totalUsers: number;
+  totalPosts: number;
+  totalComments: number;
+}
+
 interface RawCountItem {
   count?: number;
 }
@@ -73,6 +81,7 @@ interface RawPostRow {
   content: string;
   image_url: string | null;
   likes_count: number | null;
+  is_pinned?: boolean | null;
   created_at: string;
   author: PostAuthor | PostAuthor[] | null;
   comments: RawCountItem[] | null;
@@ -118,6 +127,7 @@ function mapRawPost(
     title: row.title ?? null,
     content: row.content ?? '',
     image_url: row.image_url ?? null,
+    is_pinned: Boolean(row.is_pinned),
     created_at: row.created_at,
     author: normalizeAuthor(row.author),
     likes_count: likesFromRelation ?? row.likes_count ?? 0,
@@ -126,7 +136,28 @@ function mapRawPost(
   };
 }
 
-const POST_SELECT = `
+function isMissingPinColumnError(message: string | undefined): boolean {
+  const lower = (message ?? '').toLowerCase();
+  return lower.includes('is_pinned') && (lower.includes('does not exist') || lower.includes('could not find'));
+}
+
+const POST_SELECT_WITH_PIN = `
+  id,
+  author_id,
+  mode,
+  category,
+  title,
+  content,
+  image_url,
+  likes_count,
+  is_pinned,
+  created_at,
+  author:profiles!posts_author_id_fkey(id, username, avatar_url, role),
+  comments(count),
+  post_likes(count)
+`;
+
+const POST_SELECT_BASE = `
   id,
   author_id,
   mode,
@@ -136,26 +167,52 @@ const POST_SELECT = `
   image_url,
   likes_count,
   created_at,
-  author:profiles!posts_author_id_fkey(id, username, avatar_url),
+  author:profiles!posts_author_id_fkey(id, username, avatar_url, role),
   comments(count),
   post_likes(count)
 `;
+
+export function sortPostsWithPinnedFirst(posts: PostRecord[]): PostRecord[] {
+  return [...posts].sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) {
+      return a.is_pinned ? -1 : 1;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
 
 export async function fetchPostsByMode(
   mode: PostMode,
   currentUserId?: string | null
 ): Promise<PostRecord[]> {
-  const { data, error } = await supabase
+  let rows: RawPostRow[] = [];
+
+  const withPinResult = await supabase
     .from('posts')
-    .select(POST_SELECT)
+    .select(POST_SELECT_WITH_PIN)
     .eq('mode', mode)
+    .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 
-  if (error) {
-    throw new Error(error.message);
+  if (withPinResult.error) {
+    if (isMissingPinColumnError(withPinResult.error.message)) {
+      const fallbackResult = await supabase
+        .from('posts')
+        .select(POST_SELECT_BASE)
+        .eq('mode', mode)
+        .order('created_at', { ascending: false });
+
+      if (fallbackResult.error) {
+        throw new Error(fallbackResult.error.message);
+      }
+      rows = (fallbackResult.data ?? []) as unknown as RawPostRow[];
+    } else {
+      throw new Error(withPinResult.error.message);
+    }
+  } else {
+    rows = (withPinResult.data ?? []) as unknown as RawPostRow[];
   }
 
-  const rows = (data ?? []) as unknown as RawPostRow[];
   const likedPostIds = new Set<string>();
 
   if (currentUserId && rows.length > 0) {
@@ -173,24 +230,43 @@ export async function fetchPostsByMode(
     }
   }
 
-  return rows.map((row) => mapRawPost(row, likedPostIds));
+  return sortPostsWithPinnedFirst(
+    rows.map((row) => mapRawPost(row, likedPostIds))
+  );
 }
 
 export async function fetchPostById(
   postId: string,
   currentUserId?: string | null
 ): Promise<PostRecord | null> {
-  const { data, error } = await supabase
+  let rawRow: RawPostRow | null = null;
+
+  const withPinResult = await supabase
     .from('posts')
-    .select(POST_SELECT)
+    .select(POST_SELECT_WITH_PIN)
     .eq('id', postId)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+  if (withPinResult.error) {
+    if (isMissingPinColumnError(withPinResult.error.message)) {
+      const fallbackResult = await supabase
+        .from('posts')
+        .select(POST_SELECT_BASE)
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (fallbackResult.error) {
+        throw new Error(fallbackResult.error.message);
+      }
+      rawRow = (fallbackResult.data as unknown as RawPostRow | null) ?? null;
+    } else {
+      throw new Error(withPinResult.error.message);
+    }
+  } else {
+    rawRow = (withPinResult.data as unknown as RawPostRow | null) ?? null;
   }
 
-  if (!data) return null;
+  if (!rawRow) return null;
 
   const likedPostIds = new Set<string>();
   if (currentUserId) {
@@ -206,7 +282,7 @@ export async function fetchPostById(
     }
   }
 
-  return mapRawPost(data as unknown as RawPostRow, likedPostIds);
+  return mapRawPost(rawRow, likedPostIds);
 }
 
 export async function togglePostLike(
@@ -233,6 +309,53 @@ export async function togglePostLike(
     if (error && error.code !== '23505') {
       throw new Error(error.message);
     }
+  }
+}
+
+export async function togglePostPin(
+  postId: string,
+  nextPinned: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_pinned: nextPinned })
+    .eq('id', postId);
+
+  if (error) {
+    if (isMissingPinColumnError(error.message)) {
+      throw new Error(
+        'Falta la columna is_pinned en la tabla posts. Ejecuta el SQL de configuración en Supabase para activar las publicaciones fijadas.'
+      );
+    }
+    throw new Error(error.message);
+  }
+}
+
+export async function updatePost(params: {
+  postId: string;
+  userId: string;
+  isOwner: boolean;
+  category: string;
+  title: string | null;
+  content: string;
+}): Promise<void> {
+  let query = supabase
+    .from('posts')
+    .update({
+      category: params.category,
+      title: params.title,
+      content: params.content,
+    })
+    .eq('id', params.postId);
+
+  if (!params.isOwner) {
+    query = query.eq('author_id', params.userId);
+  }
+
+  const { error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
   }
 }
 
@@ -307,13 +430,15 @@ export async function createPost(params: {
 
 export async function deletePost(
   postId: string,
-  userId: string
+  userId: string,
+  isOwner = false
 ): Promise<void> {
-  const { error } = await supabase
-    .from('posts')
-    .delete()
-    .eq('id', postId)
-    .eq('author_id', userId);
+  let query = supabase.from('posts').delete().eq('id', postId);
+  if (!isOwner) {
+    query = query.eq('author_id', userId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     throw new Error(error.message);
@@ -326,7 +451,7 @@ export async function fetchCommentsForPost(
   const { data, error } = await supabase
     .from('comments')
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url)'
+      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role)'
     )
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
@@ -362,7 +487,7 @@ export async function createComment(params: {
       parent_id: params.parentId ?? null,
     })
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url)'
+      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role)'
     )
     .single();
 
@@ -384,17 +509,37 @@ export async function createComment(params: {
 
 export async function deleteComment(
   commentId: string,
-  userId: string
+  userId: string,
+  isOwner = false
 ): Promise<void> {
-  const { error } = await supabase
-    .from('comments')
-    .delete()
-    .eq('id', commentId)
-    .eq('author_id', userId);
+  let query = supabase.from('comments').delete().eq('id', commentId);
+  if (!isOwner) {
+    query = query.eq('author_id', userId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function fetchOwnerStats(): Promise<OwnerPlatformStats> {
+  const [usersRes, postsRes, commentsRes] = await Promise.all([
+    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+    supabase.from('posts').select('*', { count: 'exact', head: true }),
+    supabase.from('comments').select('*', { count: 'exact', head: true }),
+  ]);
+
+  if (usersRes.error) throw new Error(usersRes.error.message);
+  if (postsRes.error) throw new Error(postsRes.error.message);
+  if (commentsRes.error) throw new Error(commentsRes.error.message);
+
+  return {
+    totalUsers: usersRes.count ?? 0,
+    totalPosts: postsRes.count ?? 0,
+    totalComments: commentsRes.count ?? 0,
+  };
 }
 
 export function buildCommentTree(comments: CommentRecord[]): CommentNode[] {

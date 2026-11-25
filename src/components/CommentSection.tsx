@@ -25,6 +25,7 @@ import {
   type CommentRecord,
 } from '../lib/posts';
 import { Avatar } from './Avatar';
+import { OwnerBadge } from './OwnerBadge';
 
 interface CommentSectionProps {
   postId: string;
@@ -38,6 +39,7 @@ interface CommentItemProps {
   node: CommentNode;
   depth: number;
   currentUserId?: string | null;
+  isPlatformOwner: boolean;
   activeReplyId: string | null;
   onToggleReply: (commentId: string | null) => void;
   onSubmitReply: (parentId: string, content: string) => Promise<void>;
@@ -49,6 +51,7 @@ function CommentItem({
   node,
   depth,
   currentUserId,
+  isPlatformOwner,
   activeReplyId,
   onToggleReply,
   onSubmitReply,
@@ -62,7 +65,9 @@ function CommentItem({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isReplying = activeReplyId === node.id;
-  const isOwner = Boolean(currentUserId && currentUserId === node.author_id);
+  const canDelete = Boolean(
+    isPlatformOwner || (currentUserId && currentUserId === node.author_id)
+  );
   const authorName = getAuthorDisplayName(node.author);
 
   // Limita sangría visual en niveles profundos para mantener legibilidad móvil
@@ -122,6 +127,7 @@ function CommentItem({
               <span className="font-semibold text-[#E8ECF4] truncate max-w-[180px]">
                 {authorName}
               </span>
+              <OwnerBadge role={node.author?.role} size="xs" />
               <span aria-hidden="true" className="text-[#596273]">
                 ·
               </span>
@@ -154,7 +160,7 @@ function CommentItem({
                 <span>{isReplying ? 'Cancelar' : 'Responder'}</span>
               </button>
 
-              {isOwner && !confirmingDelete && (
+              {canDelete && !confirmingDelete && (
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
@@ -165,7 +171,7 @@ function CommentItem({
                 </button>
               )}
 
-              {isOwner && confirmingDelete && (
+              {canDelete && confirmingDelete && (
                 <div className="inline-flex items-center gap-1.5 pl-1 text-xs">
                   <span className="text-[#9AA4B6]">¿Eliminar comentario?</span>
                   <button
@@ -249,6 +255,7 @@ function CommentItem({
               node={child}
               depth={depth + 1}
               currentUserId={currentUserId}
+              isPlatformOwner={isPlatformOwner}
               activeReplyId={activeReplyId}
               onToggleReply={onToggleReply}
               onSubmitReply={onSubmitReply}
@@ -267,7 +274,7 @@ export function CommentSection({
   onOpenAuth,
   onCommentCountChange,
 }: CommentSectionProps) {
-  const { user, profile, isAuthenticated } = useAuth();
+  const { user, profile, isAuthenticated, isOwner } = useAuth();
   const [comments, setComments] = useState<CommentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -330,6 +337,7 @@ export function CommentSection({
           id: user.id,
           username: profile?.username ?? null,
           avatar_url: profile?.avatar_url ?? null,
+          role: profile?.role ?? null,
         },
       };
 
@@ -369,6 +377,7 @@ export function CommentSection({
         id: user.id,
         username: profile?.username ?? null,
         avatar_url: profile?.avatar_url ?? null,
+        role: profile?.role ?? null,
       },
     };
 
@@ -381,11 +390,18 @@ export function CommentSection({
 
   async function handleDeleteComment(commentId: string) {
     if (!user) return;
-    await deleteComment(commentId, user.id);
-    // Recarga para reflejar cascadas de respuestas si existen en la BD
-    const refreshed = await fetchCommentsForPost(postId);
-    setComments(refreshed);
-    onCommentCountChange?.(refreshed.length);
+    try {
+      await deleteComment(commentId, user.id, isOwner);
+      const refreshed = await fetchCommentsForPost(postId);
+      setComments(refreshed);
+      onCommentCountChange?.(refreshed.length);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo eliminar el comentario.'
+      );
+    }
   }
 
   return (
@@ -526,6 +542,7 @@ export function CommentSection({
               node={rootNode}
               depth={0}
               currentUserId={user?.id}
+              isPlatformOwner={isOwner}
               activeReplyId={activeReplyId}
               onToggleReply={setActiveReplyId}
               onSubmitReply={handleSubmitReply}

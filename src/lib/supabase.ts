@@ -27,6 +27,11 @@ export interface UserProfile {
   username: string | null;
   bio: string | null;
   avatar_url: string | null;
+  role: string | null;
+}
+
+export function isOwnerRole(role: string | null | undefined): boolean {
+  return (role ?? '').trim().toLowerCase() === 'owner';
 }
 
 export function isSafeHttpUrl(url: string | null | undefined): boolean {

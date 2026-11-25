@@ -4,8 +4,12 @@ import {
   Heart,
   MessageSquare,
   PenSquare,
+  Pencil,
+  Pin,
+  PinOff,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -14,11 +18,15 @@ import {
   fetchPostsByMode,
   formatRelativeDate,
   getAuthorDisplayName,
+  sortPostsWithPinnedFirst,
   togglePostLike,
+  togglePostPin,
   type PostRecord,
 } from '../lib/posts';
 import { Avatar } from './Avatar';
+import { EditPostModal } from './EditPostModal';
 import { MediaImage } from './MediaImage';
+import { OwnerBadge } from './OwnerBadge';
 
 interface ComunidadFeedProps {
   selectedCategory: string;
@@ -43,13 +51,16 @@ export function ComunidadFeed({
   onOpenAuth,
   onOpenCreate,
 }: ComunidadFeedProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isOwner } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
+  const [pinningIds, setPinningIds] = useState<Record<string, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingPost, setEditingPost] = useState<PostRecord | null>(null);
 
   const loadThreads = useCallback(async () => {
     setIsLoading(true);
@@ -75,8 +86,10 @@ export function ComunidadFeed({
   useEffect(() => {
     if (!syncedPostUpdate || syncedPostUpdate.mode !== 'comunidad') return;
     setPosts((prev) =>
-      prev.map((item) =>
-        item.id === syncedPostUpdate.id ? syncedPostUpdate : item
+      sortPostsWithPinnedFirst(
+        prev.map((item) =>
+          item.id === syncedPostUpdate.id ? syncedPostUpdate : item
+        )
       )
     );
   }, [syncedPostUpdate]);
@@ -87,8 +100,11 @@ export function ComunidadFeed({
   }, [deletedPostId]);
 
   const filteredPosts = useMemo(() => {
-    if (selectedCategory === 'Todos') return posts;
-    return posts.filter((post) => post.category === selectedCategory);
+    const base =
+      selectedCategory === 'Todos'
+        ? posts
+        : posts.filter((post) => post.category === selectedCategory);
+    return sortPostsWithPinnedFirst(base);
   }, [posts, selectedCategory]);
 
   async function handleToggleLike(post: PostRecord) {
@@ -129,20 +145,65 @@ export function ComunidadFeed({
     }
   }
 
+  async function handleTogglePin(post: PostRecord) {
+    if (!isOwner || pinningIds[post.id]) return;
+    setActionError(null);
+    const nextPinned = !post.is_pinned;
+
+    setPinningIds((prev) => ({ ...prev, [post.id]: true }));
+    setPosts((prev) =>
+      sortPostsWithPinnedFirst(
+        prev.map((item) =>
+          item.id === post.id ? { ...item, is_pinned: nextPinned } : item
+        )
+      )
+    );
+
+    try {
+      await togglePostPin(post.id, nextPinned);
+    } catch (err) {
+      setPosts((prev) =>
+        sortPostsWithPinnedFirst(
+          prev.map((item) =>
+            item.id === post.id
+              ? { ...item, is_pinned: post.is_pinned }
+              : item
+          )
+        )
+      );
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cambiar el estado de fijado.'
+      );
+    } finally {
+      setPinningIds((prev) => ({ ...prev, [post.id]: false }));
+    }
+  }
+
   async function handleConfirmDelete(postId: string) {
     if (!user) return;
     setDeletingId(postId);
+    setActionError(null);
     try {
-      await deletePost(postId, user.id);
+      await deletePost(postId, user.id, isOwner);
       setPosts((prev) => prev.filter((item) => item.id !== postId));
       setConfirmDeleteId(null);
     } catch (err) {
-      setErrorMsg(
+      setActionError(
         err instanceof Error ? err.message : 'No se pudo eliminar el hilo.'
       );
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function handleEditedSaved(updated: PostRecord) {
+    setPosts((prev) =>
+      sortPostsWithPinnedFirst(
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      )
+    );
   }
 
   return (
@@ -192,6 +253,30 @@ export function ComunidadFeed({
           </div>
         </div>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="mt-5 flex items-start justify-between gap-3 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-100"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle
+              size={18}
+              className="mt-0.5 shrink-0 text-red-400"
+              aria-hidden="true"
+            />
+            <span>{actionError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="Cerrar aviso"
+            className="shrink-0 rounded-lg p-1 text-red-200 hover:bg-white/10"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {/* Feed dinámico de hilos */}
       {isLoading ? (
@@ -275,14 +360,27 @@ export function ComunidadFeed({
       ) : (
         <div className="mt-5 space-y-4">
           {filteredPosts.map((thread) => {
-            const isOwner = Boolean(user && user.id === thread.author_id);
+            const canModerate = Boolean(
+              isOwner || (user && user.id === thread.author_id)
+            );
             const authorName = getAuthorDisplayName(thread.author);
 
             return (
               <article
                 key={thread.id}
-                className="rounded-2xl border border-white/[0.08] bg-[#11151D] p-4 sm:p-5 transition-colors hover:border-white/[0.14]"
+                className={`rounded-2xl border bg-[#11151D] p-4 sm:p-5 transition-colors ${
+                  thread.is_pinned
+                    ? 'border-amber-400/35 hover:border-amber-400/50'
+                    : 'border-white/[0.08] hover:border-white/[0.14]'
+                }`}
               >
+                {thread.is_pinned && (
+                  <div className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                    <Pin size={12} aria-hidden="true" />
+                    <span>Hilo fijado por el Dueño</span>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-3">
                   <Avatar
                     src={thread.author?.avatar_url}
@@ -292,11 +390,12 @@ export function ComunidadFeed({
                   />
 
                   <div className="min-w-0 flex-1">
-                    {/* Metadatos del autor y categoría sin píldoras */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                      <span className="text-sm font-semibold text-white truncate max-w-[180px]">
+                    {/* Metadatos del autor y categoría */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                      <span className="text-sm font-semibold text-white truncate max-w-[160px]">
                         {authorName}
                       </span>
+                      <OwnerBadge role={thread.author?.role} size="xs" />
                       <span aria-hidden="true" className="text-[#566072]">
                         ·
                       </span>
@@ -392,16 +491,60 @@ export function ComunidadFeed({
                         </button>
                       </div>
 
-                      {isOwner && confirmDeleteId !== thread.id && (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(thread.id)}
-                          aria-label="Eliminar hilo"
-                          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-[#7E889B] hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-0.5">
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={() => void handleTogglePin(thread)}
+                            disabled={Boolean(pinningIds[thread.id])}
+                            title={
+                              thread.is_pinned
+                                ? 'Quitar fijado'
+                                : 'Fijar arriba de Comunidad'
+                            }
+                            aria-label={
+                              thread.is_pinned
+                                ? 'Quitar fijado'
+                                : 'Fijar hilo'
+                            }
+                            className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                              thread.is_pinned
+                                ? 'text-amber-300 bg-amber-400/12 hover:bg-amber-400/20'
+                                : 'text-[#8F99AB] hover:bg-white/[0.05] hover:text-amber-300'
+                            }`}
+                          >
+                            {thread.is_pinned ? (
+                              <PinOff size={16} aria-hidden="true" />
+                            ) : (
+                              <Pin size={16} aria-hidden="true" />
+                            )}
+                          </button>
+                        )}
+
+                        {canModerate && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingPost(thread)}
+                            title="Editar hilo"
+                            aria-label="Editar hilo"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-[#8F99AB] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                          >
+                            <Pencil size={16} aria-hidden="true" />
+                          </button>
+                        )}
+
+                        {canModerate && confirmDeleteId !== thread.id && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(thread.id)}
+                            title="Eliminar hilo"
+                            aria-label="Eliminar hilo"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-[#7E889B] hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                          >
+                            <Trash2 size={16} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {confirmDeleteId === thread.id && (
@@ -435,6 +578,12 @@ export function ComunidadFeed({
           })}
         </div>
       )}
+
+      <EditPostModal
+        post={editingPost}
+        onClose={() => setEditingPost(null)}
+        onSaved={handleEditedSaved}
+      />
     </section>
   );
 }

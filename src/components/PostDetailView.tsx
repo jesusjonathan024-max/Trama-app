@@ -5,6 +5,9 @@ import {
   Heart,
   Loader2,
   MessageSquare,
+  Pencil,
+  Pin,
+  PinOff,
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -16,11 +19,14 @@ import {
   formatRelativeDate,
   getAuthorDisplayName,
   togglePostLike,
+  togglePostPin,
   type PostRecord,
 } from '../lib/posts';
 import { Avatar } from './Avatar';
 import { CommentSection } from './CommentSection';
+import { EditPostModal } from './EditPostModal';
 import { MediaImage } from './MediaImage';
+import { OwnerBadge } from './OwnerBadge';
 
 interface PostDetailViewProps {
   initialPost: PostRecord;
@@ -37,18 +43,19 @@ export function PostDetailView({
   onPostUpdated,
   onPostDeleted,
 }: PostDetailViewProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isOwner } = useAuth();
   const [post, setPost] = useState<PostRecord>(initialPost);
   const [isTogglingLike, setIsTogglingLike] = useState(false);
+  const [isTogglingPin, setIsTogglingPin] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     setPost(initialPost);
   }, [initialPost]);
 
-  // Refresca el post en segundo plano si cambia el usuario autenticado
   useEffect(() => {
     let active = true;
     async function syncPost() {
@@ -116,12 +123,39 @@ export function PostDetailView({
     }
   }
 
+  async function handleTogglePin() {
+    if (!isOwner || isTogglingPin) return;
+    setActionError(null);
+    const previous = post;
+    const optimistic: PostRecord = {
+      ...previous,
+      is_pinned: !previous.is_pinned,
+    };
+    setPost(optimistic);
+    onPostUpdated(optimistic);
+    setIsTogglingPin(true);
+
+    try {
+      await togglePostPin(post.id, optimistic.is_pinned);
+    } catch (err) {
+      setPost(previous);
+      onPostUpdated(previous);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cambiar el estado de fijado.'
+      );
+    } finally {
+      setIsTogglingPin(false);
+    }
+  }
+
   async function handleConfirmDelete() {
     if (!user) return;
     setActionError(null);
     setIsDeleting(true);
     try {
-      await deletePost(post.id, user.id);
+      await deletePost(post.id, user.id, isOwner);
       onPostDeleted(post.id);
     } catch (err) {
       setActionError(
@@ -135,13 +169,13 @@ export function PostDetailView({
   }
 
   const isActualidad = post.mode === 'actualidad';
-  const isOwner = Boolean(user && user.id === post.author_id);
+  const canModerate = Boolean(isOwner || (user && user.id === post.author_id));
   const authorName = getAuthorDisplayName(post.author);
   const readMinutes = isActualidad ? estimateReadMinutes(post.content) : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 pb-28 sm:px-6 md:px-8 md:py-10 md:pb-16">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -151,18 +185,54 @@ export function PostDetailView({
           <span>Volver a {isActualidad ? 'Actualidad' : 'Comunidad'}</span>
         </button>
 
-        {isOwner && !confirmingDelete && (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-3 text-xs font-medium text-[#9AA4B6] hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            <span>Eliminar</span>
-          </button>
+        {canModerate && !confirmingDelete && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => void handleTogglePin()}
+                disabled={isTogglingPin}
+                className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                  post.is_pinned
+                    ? 'border-amber-400/35 bg-amber-400/12 text-amber-300 hover:bg-amber-400/20'
+                    : 'border-white/[0.09] text-[#9AA4B6] hover:border-amber-400/30 hover:text-amber-300'
+                }`}
+              >
+                {post.is_pinned ? (
+                  <>
+                    <PinOff size={14} aria-hidden="true" />
+                    <span>Quitar fijado</span>
+                  </>
+                ) : (
+                  <>
+                    <Pin size={14} aria-hidden="true" />
+                    <span>Fijar</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-3 text-xs font-medium text-[#9AA4B6] hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+            >
+              <Pencil size={14} aria-hidden="true" />
+              <span>Editar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-3 text-xs font-medium text-[#9AA4B6] hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              <span>Eliminar</span>
+            </button>
+          </div>
         )}
 
-        {isOwner && confirmingDelete && (
+        {canModerate && confirmingDelete && (
           <div className="flex items-center gap-2 text-xs">
             <span className="hidden sm:inline text-[#9AA4B6]">
               ¿Eliminar publicación?
@@ -173,7 +243,9 @@ export function PostDetailView({
               onClick={handleConfirmDelete}
               className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 font-medium text-red-200 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
             >
-              {isDeleting && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
+              {isDeleting && (
+                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+              )}
               <span>Confirmar</span>
             </button>
             <button
@@ -191,6 +263,17 @@ export function PostDetailView({
       {isActualidad ? (
         <article className="border-b border-white/[0.08] pb-8">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[#7FB2FF]">
+            {post.is_pinned && (
+              <>
+                <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+                  <Pin size={12} aria-hidden="true" />
+                  <span>Fijado</span>
+                </span>
+                <span aria-hidden="true" className="text-[#566072]">
+                  ·
+                </span>
+              </>
+            )}
             <span>{post.category}</span>
             <span aria-hidden="true" className="text-[#566072]">
               ·
@@ -221,9 +304,12 @@ export function PostDetailView({
               size="md"
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#EEF2F8] truncate">
-                {authorName}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-[#EEF2F8] truncate">
+                  {authorName}
+                </p>
+                <OwnerBadge role={post.author?.role} size="sm" />
+              </div>
               <p className="text-xs text-[#8B95A5]">
                 Publicado en Actualidad
               </p>
@@ -277,6 +363,13 @@ export function PostDetailView({
         </article>
       ) : (
         <article className="border-b border-white/[0.08] pb-7">
+          {post.is_pinned && (
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+              <Pin size={12} aria-hidden="true" />
+              <span>Hilo fijado por el Dueño</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <Avatar
               src={post.author?.avatar_url}
@@ -284,10 +377,11 @@ export function PostDetailView({
               size="md"
             />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                <span className="font-semibold text-white truncate max-w-[200px]">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span className="font-semibold text-white truncate max-w-[180px]">
                   {authorName}
                 </span>
+                <OwnerBadge role={post.author?.role} size="sm" />
                 <span aria-hidden="true" className="text-[#566072]">
                   ·
                 </span>
@@ -363,7 +457,7 @@ export function PostDetailView({
       {actionError && (
         <div
           role="alert"
-          className="mt-5 flex items-center gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="mt-5 flex items-center gap-2.5 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-100"
         >
           <AlertCircle size={17} className="shrink-0 text-red-400" aria-hidden="true" />
           <span>{actionError}</span>
@@ -374,6 +468,15 @@ export function PostDetailView({
         postId={post.id}
         onOpenAuth={onOpenAuth}
         onCommentCountChange={handleCommentCountChange}
+      />
+
+      <EditPostModal
+        post={isEditing ? post : null}
+        onClose={() => setIsEditing(false)}
+        onSaved={(updated) => {
+          setPost(updated);
+          onPostUpdated(updated);
+        }}
       />
     </div>
   );

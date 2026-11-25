@@ -232,7 +232,7 @@ const SERIES_SELECT = `
   synopsis,
   cover_url,
   created_at,
-  author:profiles(id, username, avatar_url),
+  author:profiles(id, username, avatar_url, role),
   chapters(count)
 `;
 
@@ -359,13 +359,14 @@ export async function createSeries(params: {
 
 export async function deleteSeries(
   seriesId: string,
-  userId: string
+  userId: string,
+  isOwner = false
 ): Promise<void> {
-  const { error } = await supabase
-    .from('series')
-    .delete()
-    .eq('id', seriesId)
-    .eq('author_id', userId);
+  let query = supabase.from('series').delete().eq('id', seriesId);
+  if (!isOwner) {
+    query = query.eq('author_id', userId);
+  }
+  const { error } = await query;
 
   if (error) {
     throw new Error(error.message);

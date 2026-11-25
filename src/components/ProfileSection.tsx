@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -9,13 +10,20 @@ import {
   AlertCircle,
   Camera,
   CheckCircle2,
+  Crown,
+  FileText,
   Loader2,
   LogOut,
+  MessageSquare,
+  RefreshCw,
   Save,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { fetchOwnerStats, type OwnerPlatformStats } from '../lib/posts';
 import { MEDIA_BUCKET, isSafeHttpUrl, supabase } from '../lib/supabase';
 import { Avatar } from './Avatar';
+import { OwnerBadge } from './OwnerBadge';
 
 interface ProfileSectionProps {
   onOpenAuth: () => void;
@@ -42,6 +50,7 @@ export function ProfileSection({
     profile,
     profileExists,
     isAuthenticated,
+    isOwner,
     isLoadingSession,
     isLoadingProfile,
     setProfileState,
@@ -56,6 +65,10 @@ export function ProfileSection({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const [ownerStats, setOwnerStats] = useState<OwnerPlatformStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -68,6 +81,32 @@ export function ProfileSection({
     setBio(profile?.bio ?? '');
     setAvatarUrl(profile?.avatar_url ?? null);
   }, [profile]);
+
+  const loadOwnerStats = useCallback(async () => {
+    if (!isOwner) return;
+    setIsLoadingStats(true);
+    setStatsError(null);
+    try {
+      const stats = await fetchOwnerStats();
+      setOwnerStats(stats);
+    } catch (err) {
+      setStatsError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron consultar las estadísticas.'
+      );
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [isOwner]);
+
+  useEffect(() => {
+    if (!isOwner) {
+      setOwnerStats(null);
+      return;
+    }
+    void loadOwnerStats();
+  }, [isOwner, loadOwnerStats]);
 
   async function persistProfileRow(payload: {
     username: string | null;
@@ -83,7 +122,7 @@ export function ProfileSection({
         .from('profiles')
         .update(payload)
         .eq('id', user.id)
-        .select('id, username, bio, avatar_url')
+        .select('id, username, bio, avatar_url, role')
         .maybeSingle();
 
       if (error) {
@@ -97,6 +136,7 @@ export function ProfileSection({
             username: data.username ?? null,
             bio: data.bio ?? null,
             avatar_url: data.avatar_url ?? null,
+            role: data.role ?? profile?.role ?? null,
           },
           true
         );
@@ -113,7 +153,7 @@ export function ProfileSection({
         },
         { onConflict: 'id' }
       )
-      .select('id, username, bio, avatar_url')
+      .select('id, username, bio, avatar_url, role')
       .single();
 
     if (error) {
@@ -126,6 +166,7 @@ export function ProfileSection({
         username: data.username ?? null,
         bio: data.bio ?? null,
         avatar_url: data.avatar_url ?? null,
+        role: data.role ?? profile?.role ?? null,
       },
       true
     );
@@ -337,12 +378,15 @@ export function ProfileSection({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between border-b border-white/[0.08] pb-6">
         <div>
-          <h1
-            id="profile-heading"
-            className="font-display text-3xl font-bold tracking-tight text-white"
-          >
-            Mi Perfil
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1
+              id="profile-heading"
+              className="font-display text-3xl font-bold tracking-tight text-white"
+            >
+              Mi Perfil
+            </h1>
+            <OwnerBadge role={profile?.role} size="md" />
+          </div>
           <p className="mt-1.5 text-sm text-[#97A1B2]">
             Administra tu información pública y tu foto de perfil.
           </p>
@@ -362,6 +406,92 @@ export function ProfileSection({
           <span>Cerrar sesión</span>
         </button>
       </div>
+
+      {/* Panel privado de estadísticas del Dueño (visible exclusivamente para role === 'owner') */}
+      {isOwner && (
+        <div
+          aria-labelledby="owner-stats-heading"
+          className="mt-7 rounded-2xl border border-amber-400/25 bg-[#12151D] p-5 sm:p-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/12 text-amber-300">
+                <Crown size={18} aria-hidden="true" />
+              </div>
+              <div>
+                <h2
+                  id="owner-stats-heading"
+                  className="font-display text-lg font-bold tracking-tight text-white"
+                >
+                  Panel del Dueño
+                </h2>
+                <p className="text-xs text-[#8F99AB]">
+                  Resumen general privado de Trama · Solo visible para tu cuenta
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void loadOwnerStats()}
+              disabled={isLoadingStats}
+              aria-label="Actualizar estadísticas"
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#171B25] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+            >
+              <RefreshCw
+                size={14}
+                className={isLoadingStats ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
+              <span>Actualizar</span>
+            </button>
+          </div>
+
+          {statsError ? (
+            <div
+              role="alert"
+              className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200"
+            >
+              <AlertCircle size={15} className="shrink-0 text-red-400" aria-hidden="true" />
+              <span>{statsError}</span>
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
+                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+                  <span>Usuarios registrados</span>
+                  <Users size={15} className="text-amber-300/80" aria-hidden="true" />
+                </div>
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
+                  {isLoadingStats && !ownerStats ? '—' : ownerStats?.totalUsers ?? 0}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
+                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+                  <span>Publicaciones activas</span>
+                  <FileText size={15} className="text-amber-300/80" aria-hidden="true" />
+                </div>
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
+                  {isLoadingStats && !ownerStats ? '—' : ownerStats?.totalPosts ?? 0}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
+                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+                  <span>Comentarios</span>
+                  <MessageSquare size={15} className="text-amber-300/80" aria-hidden="true" />
+                </div>
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
+                  {isLoadingStats && !ownerStats
+                    ? '—'
+                    : ownerStats?.totalComments ?? 0}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Columna izquierda: Foto de perfil e identidad de cuenta */}
@@ -386,9 +516,13 @@ export function ProfileSection({
                 )}
               </div>
 
-              <h2 className="mt-4 font-display text-lg font-semibold text-white max-w-full truncate">
-                {username.trim() || 'Sin nombre de usuario'}
-              </h2>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 max-w-full">
+                <h2 className="font-display text-lg font-semibold text-white max-w-full truncate">
+                  {username.trim() || 'Sin nombre de usuario'}
+                </h2>
+                <OwnerBadge role={profile?.role} size="sm" />
+              </div>
+
               <p className="mt-1 text-xs text-[#8B95A5] max-w-full truncate">
                 {user.email}
               </p>

@@ -26,6 +26,7 @@ import { formatEditorialDate, getAuthorDisplayName } from '../lib/posts';
 import { Avatar } from './Avatar';
 import { CreateChapterModal } from './CreateChapterModal';
 import { MediaImage } from './MediaImage';
+import { OwnerBadge } from './OwnerBadge';
 
 interface SeriesDetailViewProps {
   initialSeries: SeriesRecord;
@@ -46,7 +47,7 @@ export function SeriesDetailView({
   onSeriesDeleted,
   onSeriesChanged,
 }: SeriesDetailViewProps) {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const [series, setSeries] = useState<SeriesRecord>(initialSeries);
   const [chapters, setChapters] = useState<ChapterRecord[]>([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
@@ -125,6 +126,7 @@ export function SeriesDetailView({
   }, [progress, ascendingChapters]);
 
   const isCreator = Boolean(user && user.id === series.author_id);
+  const canModerate = Boolean(isOwner || isCreator);
   const isManhwa = isManhwaType(series.type);
   const authorName = getAuthorDisplayName(series.author);
 
@@ -142,11 +144,11 @@ export function SeriesDetailView({
   }
 
   async function handleConfirmDeleteSeries() {
-    if (!user || !isCreator) return;
+    if (!user || !canModerate) return;
     setIsDeletingSeries(true);
     setErrorMsg(null);
     try {
-      await deleteSeries(series.id, user.id);
+      await deleteSeries(series.id, user.id, isOwner);
       onSeriesDeleted(series.id);
     } catch (err) {
       setErrorMsg(
@@ -158,7 +160,7 @@ export function SeriesDetailView({
   }
 
   async function handleConfirmDeleteChapter(chapterId: string) {
-    if (!user || !isCreator) return;
+    if (!user || !canModerate) return;
     setDeletingChapterId(chapterId);
     setErrorMsg(null);
     try {
@@ -190,7 +192,7 @@ export function SeriesDetailView({
           <span>Volver a Biblioteca</span>
         </button>
 
-        {isCreator && !confirmingDeleteSeries && (
+        {canModerate && !confirmingDeleteSeries && (
           <button
             type="button"
             onClick={() => setConfirmingDeleteSeries(true)}
@@ -201,7 +203,7 @@ export function SeriesDetailView({
           </button>
         )}
 
-        {isCreator && confirmingDeleteSeries && (
+        {canModerate && confirmingDeleteSeries && (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-[#9AA4B6]">¿Eliminar esta obra?</span>
             <button
@@ -287,7 +289,7 @@ export function SeriesDetailView({
               {series.title}
             </h1>
 
-            <div className="mt-4 flex items-center gap-2.5">
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
               <Avatar
                 src={series.author?.avatar_url}
                 name={series.author?.username}
@@ -296,6 +298,7 @@ export function SeriesDetailView({
               <span className="text-sm font-medium text-[#D5DCE6]">
                 {authorName}
               </span>
+              <OwnerBadge role={series.author?.role} size="sm" />
             </div>
 
             <div className="mt-5">
@@ -485,7 +488,7 @@ export function SeriesDetailView({
                     />
                   </button>
 
-                  {isCreator && !isConfirming && (
+                  {canModerate && !isConfirming && (
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteChapterId(chapter.id)}
@@ -496,7 +499,7 @@ export function SeriesDetailView({
                     </button>
                   )}
 
-                  {isCreator && isConfirming && (
+                  {canModerate && isConfirming && (
                     <div className="flex items-center justify-end gap-2 text-xs">
                       <span className="text-[#9AA4B6]">¿Eliminar?</span>
                       <button
