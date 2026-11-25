@@ -1,0 +1,6 @@
+{
+  "name": "Trama",
+  "description": "Plataforma web moderna en español con modos de Actualidad, Comunidad y Biblioteca, autenticación y perfil de usuario conectado a Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
