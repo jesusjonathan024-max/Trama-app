@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Globe,
   Heart,
   Loader2,
   MessageSquare,
   Pencil,
   Pin,
   PinOff,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +36,7 @@ interface PostDetailViewProps {
   onOpenAuth: () => void;
   onPostUpdated: (updated: PostRecord) => void;
   onPostDeleted: (postId: string) => void;
+  onOpenAssistant: (post: PostRecord, initialPrompt?: string) => void;
 }
 
 export function PostDetailView({
@@ -42,6 +45,7 @@ export function PostDetailView({
   onOpenAuth,
   onPostUpdated,
   onPostDeleted,
+  onOpenAssistant,
 }: PostDetailViewProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
   const [post, setPost] = useState<PostRecord>(initialPost);
@@ -297,22 +301,54 @@ export function PostDetailView({
             {post.title || 'Artículo sin título'}
           </h1>
 
-          <div className="mt-6 flex items-center gap-3 border-y border-white/[0.07] py-4">
-            <Avatar
-              src={post.author?.avatar_url}
-              name={post.author?.username}
-              size="md"
-            />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-[#EEF2F8] truncate">
-                  {authorName}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-white/[0.07] py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Avatar
+                src={post.author?.avatar_url}
+                name={post.author?.username}
+                size="md"
+              />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-[#EEF2F8] truncate">
+                    {authorName}
+                  </p>
+                  <OwnerBadge role={post.author?.role} size="sm" />
+                </div>
+                <p className="text-xs text-[#8B95A5]">
+                  Publicado en Actualidad
                 </p>
-                <OwnerBadge role={post.author?.role} size="sm" />
               </div>
-              <p className="text-xs text-[#8B95A5]">
-                Publicado en Actualidad
-              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenAssistant(
+                    post,
+                    'Resúmeme este artículo en 4 puntos clave claros y objetivos.'
+                  )
+                }
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>Resumir con IA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenAssistant(
+                    post,
+                    'Verifica en Google los datos, cifras o hechos más recientes mencionados en este artículo.'
+                  )
+                }
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#121620] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white transition-colors"
+              >
+                <Globe size={14} className="text-[#7FB2FF]" aria-hidden="true" />
+                <span>Verificar datos</span>
+              </button>
             </div>
           </div>
 
@@ -422,34 +458,45 @@ export function PostDetailView({
             </div>
           )}
 
-          <div className="mt-6 flex items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleToggleLike}
+                disabled={isTogglingLike}
+                aria-pressed={post.liked_by_me}
+                className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                  post.liked_by_me
+                    ? 'border-rose-400/35 bg-rose-500/12 text-rose-200'
+                    : 'border-white/[0.1] bg-[#121620] text-[#CBD5E1] hover:border-white/[0.2] hover:text-white'
+                }`}
+              >
+                <Heart
+                  size={17}
+                  className={post.liked_by_me ? 'fill-rose-400 text-rose-400' : ''}
+                  aria-hidden="true"
+                />
+                <span className="tabular-nums">{post.likes_count}</span>
+                <span className="text-xs opacity-80">Me gusta</span>
+              </button>
+
+              <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[#8B95A5]">
+                <MessageSquare size={17} aria-hidden="true" />
+                <span className="tabular-nums">{post.comments_count}</span>
+                <span className="text-xs">
+                  {post.comments_count === 1 ? 'comentario' : 'comentarios'}
+                </span>
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={handleToggleLike}
-              disabled={isTogglingLike}
-              aria-pressed={post.liked_by_me}
-              className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
-                post.liked_by_me
-                  ? 'border-rose-400/35 bg-rose-500/12 text-rose-200'
-                  : 'border-white/[0.1] bg-[#121620] text-[#CBD5E1] hover:border-white/[0.2] hover:text-white'
-              }`}
+              onClick={() => onOpenAssistant(post)}
+              className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3.5 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors"
             >
-              <Heart
-                size={17}
-                className={post.liked_by_me ? 'fill-rose-400 text-rose-400' : ''}
-                aria-hidden="true"
-              />
-              <span className="tabular-nums">{post.likes_count}</span>
-              <span className="text-xs opacity-80">Me gusta</span>
+              <Sparkles size={14} aria-hidden="true" />
+              <span>Consultar / Verificar con IA</span>
             </button>
-
-            <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[#8B95A5]">
-              <MessageSquare size={17} aria-hidden="true" />
-              <span className="tabular-nums">{post.comments_count}</span>
-              <span className="text-xs">
-                {post.comments_count === 1 ? 'comentario' : 'comentarios'}
-              </span>
-            </div>
           </div>
         </article>
       )}

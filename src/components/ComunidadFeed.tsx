@@ -7,6 +7,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Sparkles,
   Trash2,
   Users,
   X,
@@ -37,6 +38,7 @@ interface ComunidadFeedProps {
   onSelectPost: (post: PostRecord) => void;
   onOpenAuth: () => void;
   onOpenCreate: () => void;
+  onOpenAssistant: () => void;
 }
 
 const FILTER_OPTIONS = ['Todos', ...COMUNIDAD_CATEGORIES] as const;
@@ -50,6 +52,7 @@ export function ComunidadFeed({
   onSelectPost,
   onOpenAuth,
   onOpenCreate,
+  onOpenAssistant,
 }: ComunidadFeedProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -214,16 +217,27 @@ export function ComunidadFeed({
       {/* Cabecera + filtro horizontal */}
       <div className="border-b border-white/[0.08] pb-5">
         <div className="flex flex-col gap-4">
-          <div>
-            <h1
-              id="comunidad-heading"
-              className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl"
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1
+                id="comunidad-heading"
+                className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl"
+              >
+                Comunidad
+              </h1>
+              <p className="mt-1 text-sm text-[#8F99AB]">
+                Hilos rápidos, debates abiertos y conversaciones en vivo.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenAssistant}
+              className="min-h-[40px] inline-flex items-center gap-2 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3.5 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
             >
-              Comunidad
-            </h1>
-            <p className="mt-1 text-sm text-[#8F99AB]">
-              Hilos rápidos, debates abiertos y conversaciones en vivo.
-            </p>
+              <Sparkles size={15} aria-hidden="true" />
+              <span>Asistente IA</span>
+            </button>
           </div>
 
           <div

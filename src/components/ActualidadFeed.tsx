@@ -8,6 +8,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ interface ActualidadFeedProps {
   onSelectPost: (post: PostRecord) => void;
   onOpenAuth: () => void;
   onOpenCreate: () => void;
+  onOpenAssistant: () => void;
 }
 
 const FILTER_OPTIONS = ['Todas', ...ACTUALIDAD_CATEGORIES] as const;
@@ -51,6 +53,7 @@ export function ActualidadFeed({
   onSelectPost,
   onOpenAuth,
   onOpenCreate,
+  onOpenAssistant,
 }: ActualidadFeedProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -220,16 +223,27 @@ export function ActualidadFeed({
       {/* Cabecera editorial + filtro horizontal de categorías */}
       <div className="border-b border-white/[0.08] pb-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1
-              id="actualidad-heading"
-              className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl"
+          <div className="flex flex-wrap items-start justify-between gap-3 md:flex-col md:items-start">
+            <div>
+              <h1
+                id="actualidad-heading"
+                className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl"
+              >
+                Actualidad
+              </h1>
+              <p className="mt-1 text-sm text-[#8F99AB]">
+                Artículos largos, crónicas y análisis de fondo.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenAssistant}
+              className="min-h-[40px] inline-flex items-center gap-2 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3.5 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
             >
-              Actualidad
-            </h1>
-            <p className="mt-1 text-sm text-[#8F99AB]">
-              Artículos largos, crónicas y análisis de fondo.
-            </p>
+              <Sparkles size={15} aria-hidden="true" />
+              <span>Asistente IA</span>
+            </button>
           </div>
 
           <div

@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { ActualidadFeed } from './components/ActualidadFeed';
+import { AiAssistantDrawer } from './components/AiAssistantDrawer';
+import { ArcadeSection } from './components/ArcadeSection';
 import { AuthModal } from './components/AuthModal';
 import {
   BibliotecaCatalog,
@@ -15,8 +17,9 @@ import { PostDetailView } from './components/PostDetailView';
 import { ProfileSection } from './components/ProfileSection';
 import { SeriesDetailView } from './components/SeriesDetailView';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import type { AiChatContext } from './lib/ai';
 import type { ChapterRecord, SeriesRecord } from './lib/library';
-import type { PostMode, PostRecord } from './lib/posts';
+import { getAuthorDisplayName, type PostMode, type PostRecord } from './lib/posts';
 
 interface ActiveReaderState {
   series: SeriesRecord;
@@ -54,6 +57,32 @@ function AppShell() {
   );
   const [deletedSeriesId, setDeletedSeriesId] = useState<string | null>(null);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
+
+  // Estado del Asistente IA con búsqueda en vivo
+  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+  const [aiContext, setAiContext] = useState<AiChatContext | null>(null);
+  const [aiInitialPrompt, setAiInitialPrompt] = useState<string | null>(null);
+
+  const openSectionAssistant = useCallback((section: 'actualidad' | 'comunidad') => {
+    setAiContext({ section });
+    setAiInitialPrompt(null);
+    setIsAiDrawerOpen(true);
+  }, []);
+
+  const openPostAssistant = useCallback(
+    (post: PostRecord, initialPrompt?: string) => {
+      setAiContext({
+        section: post.mode,
+        title: post.title,
+        category: post.category,
+        author: getAuthorDisplayName(post.author),
+        content: post.content,
+      });
+      setAiInitialPrompt(initialPrompt ?? null);
+      setIsAiDrawerOpen(true);
+    },
+    []
+  );
 
   const handleSelectView = useCallback((view: ActiveView) => {
     setSelectedPost(null);
@@ -175,6 +204,7 @@ function AppShell() {
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onPostUpdated={handlePostUpdated}
             onPostDeleted={handlePostDeleted}
+            onOpenAssistant={openPostAssistant}
           />
         ) : selectedSeries ? (
           <SeriesDetailView
@@ -199,6 +229,7 @@ function AppShell() {
             onSelectPost={handleSelectPost}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onOpenCreate={() => setIsCreatePostModalOpen(true)}
+            onOpenAssistant={() => openSectionAssistant('actualidad')}
           />
         ) : activeView === 'comunidad' ? (
           <ComunidadFeed
@@ -210,7 +241,10 @@ function AppShell() {
             onSelectPost={handleSelectPost}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onOpenCreate={() => setIsCreatePostModalOpen(true)}
+            onOpenAssistant={() => openSectionAssistant('comunidad')}
           />
+        ) : activeView === 'arcade' ? (
+          <ArcadeSection />
         ) : (
           <BibliotecaCatalog
             selectedFilter={bibliotecaFilter}
@@ -250,6 +284,14 @@ function AppShell() {
         isOpen={isCreateSeriesModalOpen}
         onClose={() => setIsCreateSeriesModalOpen(false)}
         onCreated={handleSeriesCreated}
+      />
+
+      <AiAssistantDrawer
+        isOpen={isAiDrawerOpen}
+        onClose={() => setIsAiDrawerOpen(false)}
+        context={aiContext}
+        initialPrompt={aiInitialPrompt}
+        onClearInitialPrompt={() => setAiInitialPrompt(null)}
       />
 
       <AuthModal

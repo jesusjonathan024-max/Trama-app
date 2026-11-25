@@ -1,4 +1,4 @@
-import { BookOpen, Newspaper, Users } from 'lucide-react';
+import { BookOpen, Gamepad2, Newspaper, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { APP_MODES, type AppMode } from './Navbar';
 
@@ -12,6 +12,7 @@ const MODE_ICONS = {
   actualidad: Newspaper,
   comunidad: Users,
   biblioteca: BookOpen,
+  arcade: Gamepad2,
 };
 
 export function ModePlaceholder({

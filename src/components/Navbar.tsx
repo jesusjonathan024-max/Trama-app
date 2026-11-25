@@ -1,8 +1,8 @@
-import { BookOpen, Newspaper, UserRound, Users } from 'lucide-react';
+import { BookOpen, Gamepad2, Newspaper, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from './Avatar';
 
-export type AppMode = 'actualidad' | 'comunidad' | 'biblioteca';
+export type AppMode = 'actualidad' | 'comunidad' | 'biblioteca' | 'arcade';
 export type ActiveView = AppMode | 'perfil';
 
 export interface ModeDefinition {
@@ -30,12 +30,19 @@ export const APP_MODES: ModeDefinition[] = [
     description:
       'Series, capítulos y lecturas organizadas para explorar a tu propio ritmo.',
   },
+  {
+    id: 'arcade',
+    label: 'Arcade',
+    description:
+      'Minijuegos retro-fantasía jugables al instante en el navegador.',
+  },
 ];
 
 const MODE_ICONS = {
   actualidad: Newspaper,
   comunidad: Users,
   biblioteca: BookOpen,
+  arcade: Gamepad2,
 };
 
 interface NavbarProps {
@@ -183,8 +190,8 @@ export function Navbar({
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-[#0D1016]/95 backdrop-blur-md pb-safe"
       >
         <div
-          className={`grid h-16 items-center px-2 ${
-            isAuthenticated ? 'grid-cols-4' : 'grid-cols-3'
+          className={`grid h-16 items-center px-1.5 ${
+            isAuthenticated ? 'grid-cols-5' : 'grid-cols-4'
           }`}
         >
           {APP_MODES.map((mode) => {
@@ -202,8 +209,8 @@ export function Navbar({
                     : 'text-[#8B95A5] hover:text-[#E2E7F0]'
                 }`}
               >
-                <Icon size={21} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
-                <span className="text-[11px] font-medium tracking-tight whitespace-nowrap">
+                <Icon size={20} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
+                <span className="text-[10.5px] font-medium tracking-tight whitespace-nowrap">
                   {mode.label}
                 </span>
               </button>
@@ -222,12 +229,12 @@ export function Navbar({
               }`}
             >
               <UserRound
-                size={21}
+                size={20}
                 strokeWidth={activeView === 'perfil' ? 2.25 : 1.75}
                 aria-hidden="true"
               />
-              <span className="text-[11px] font-medium tracking-tight whitespace-nowrap">
-                Mi Perfil
+              <span className="text-[10.5px] font-medium tracking-tight whitespace-nowrap">
+                Perfil
               </span>
             </button>
           )}
