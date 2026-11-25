@@ -36,6 +36,7 @@ import {
   type SeriesRatingSummary,
 } from '../lib/phase2';
 import { Avatar } from './Avatar';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { CreateChapterModal } from './CreateChapterModal';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
@@ -323,22 +324,20 @@ export function SeriesDetailView({
                 fallbackClassName="h-full w-full"
               />
             ) : (
-              <div
-                className={`flex h-full w-full flex-col items-center justify-center ${
-                  isManhwa
-                    ? 'bg-gradient-to-br from-[#2B2012] via-[#171412] to-[#0E1118]'
-                    : 'bg-gradient-to-br from-[#13233C] via-[#111622] to-[#0C0F16]'
-                }`}
-              >
-                <BookOpen size={40} className="text-white/25" aria-hidden="true" />
-              </div>
+              <CategoryCoverArtwork
+                category={series.genre || (isManhwa ? 'Manhwa' : 'Novela')}
+                title={series.title}
+                fallbackMode={isManhwa ? 'manhwa' : 'novela'}
+                variant="portrait"
+                className="h-full w-full"
+              />
             )}
 
             <span
-              className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-xs font-semibold backdrop-blur-sm ${
+              className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-sm ${
                 isManhwa
-                  ? 'bg-[#B45309]/92 text-[#FEF3C7]'
-                  : 'bg-[#1D4ED8]/92 text-[#DBEAFE]'
+                  ? 'bg-gradient-to-r from-violet-600/95 to-fuchsia-600/95'
+                  : 'bg-gradient-to-r from-indigo-600/95 to-violet-600/95'
               }`}
             >
               {isManhwa ? 'Manhwa' : 'Novela'}

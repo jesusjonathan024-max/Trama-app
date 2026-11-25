@@ -14,6 +14,33 @@ interface PollCardProps {
   onPollUpdated?: (updated: PostPollData) => void;
 }
 
+const POLL_OPTION_PALETTES = [
+  {
+    fillSelected: 'bg-gradient-to-r from-cyan-500/30 to-sky-500/24',
+    fillIdle: 'bg-gradient-to-r from-cyan-500/14 to-sky-500/10',
+    borderSelected: 'border-cyan-500/75 dark:border-cyan-400/75',
+    accentText: 'text-cyan-700 dark:text-cyan-300',
+  },
+  {
+    fillSelected: 'bg-gradient-to-r from-emerald-500/30 to-teal-500/24',
+    fillIdle: 'bg-gradient-to-r from-emerald-500/14 to-teal-500/10',
+    borderSelected: 'border-emerald-500/75 dark:border-emerald-400/75',
+    accentText: 'text-emerald-700 dark:text-emerald-300',
+  },
+  {
+    fillSelected: 'bg-gradient-to-r from-violet-500/30 to-fuchsia-500/24',
+    fillIdle: 'bg-gradient-to-r from-violet-500/14 to-fuchsia-500/10',
+    borderSelected: 'border-violet-500/75 dark:border-violet-400/75',
+    accentText: 'text-violet-700 dark:text-violet-300',
+  },
+  {
+    fillSelected: 'bg-gradient-to-r from-orange-500/30 to-rose-500/24',
+    fillIdle: 'bg-gradient-to-r from-orange-500/14 to-rose-500/10',
+    borderSelected: 'border-orange-500/75 dark:border-orange-400/75',
+    accentText: 'text-orange-700 dark:text-orange-300',
+  },
+] as const;
+
 function applyOptimisticVote(
   poll: PostPollData,
   nextIndex: number
@@ -127,6 +154,8 @@ export function PollCard({
           const isSelected = poll.userVoteIndex === opt.index;
           const isVotingThis = votingIndex === opt.index;
           const fillScale = showResults ? opt.percentage / 100 : 0;
+          const palette =
+            POLL_OPTION_PALETTES[opt.index % POLL_OPTION_PALETTES.length];
 
           return (
             <button
@@ -137,13 +166,13 @@ export function PollCard({
               aria-pressed={isSelected}
               className={`group relative flex min-h-[42px] w-full items-center justify-between gap-3 overflow-hidden rounded-xl border px-3.5 py-2 text-left text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                 isSelected
-                  ? 'border-[var(--accent-primary)] bg-[var(--bg-card)] text-[var(--text-main)]'
+                  ? `${palette.borderSelected} bg-[var(--bg-card)] text-[var(--text-main)]`
                   : poll.isClosed
                     ? 'border-[var(--border-subtle)] bg-[var(--bg-card)]/70 text-[var(--text-secondary)] cursor-default'
                     : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-main)] hover:border-[var(--accent-border)]'
               }`}
             >
-              {/* Barra de progreso animada usando el color de acento activo */}
+              {/* Barra de progreso animada con degradado vivo diferenciado */}
               <span
                 aria-hidden="true"
                 style={{
@@ -151,9 +180,7 @@ export function PollCard({
                   transformOrigin: 'left center',
                 }}
                 className={`pointer-events-none absolute inset-0 transition-transform duration-500 ease-out ${
-                  isSelected
-                    ? 'bg-[var(--accent-primary)]/20'
-                    : 'bg-[var(--accent-primary)]/10'
+                  isSelected ? palette.fillSelected : palette.fillIdle
                 }`}
               />
 
@@ -161,13 +188,13 @@ export function PollCard({
                 {isVotingThis ? (
                   <Loader2
                     size={15}
-                    className="shrink-0 animate-spin text-[var(--accent-primary)]"
+                    className={`shrink-0 animate-spin ${palette.accentText}`}
                     aria-hidden="true"
                   />
                 ) : isSelected ? (
                   <CheckCircle2
                     size={15}
-                    className="shrink-0 text-[var(--accent-primary)]"
+                    className={`shrink-0 ${palette.accentText}`}
                     aria-hidden="true"
                   />
                 ) : (
@@ -183,7 +210,7 @@ export function PollCard({
                 <span
                   className={`relative z-10 shrink-0 text-xs tabular-nums ${
                     isSelected
-                      ? 'font-bold text-[var(--accent-primary)]'
+                      ? `font-bold ${palette.accentText}`
                       : 'font-semibold text-[var(--text-secondary)]'
                   }`}
                 >

@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from 'react';
+import { getHashtagTone } from '../lib/categoryColors';
 import { splitTextWithHashtags } from '../lib/hashtags';
 
 interface HashtagTextProps {
@@ -16,23 +17,25 @@ export function HashtagText({
 
   return (
     <span className={className}>
-      {segments.map((segment, index) =>
-        segment.type === 'hashtag' ? (
-          <button
-            key={`${segment.key}-${index}`}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelectHashtag(segment.value);
-            }}
-            className="inline font-semibold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded-sm transition-colors"
-          >
-            {segment.value}
-          </button>
-        ) : (
-          <Fragment key={index}>{segment.value}</Fragment>
-        )
-      )}
+      {segments.map((segment, index) => {
+        if (segment.type === 'hashtag') {
+          const tone = getHashtagTone(segment.value);
+          return (
+            <button
+              key={`${segment.key}-${index}`}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectHashtag(segment.value);
+              }}
+              className={`inline font-bold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded-sm transition-colors ${tone.inline}`}
+            >
+              {segment.value}
+            </button>
+          );
+        }
+        return <Fragment key={index}>{segment.value}</Fragment>;
+      })}
     </span>
   );
 }

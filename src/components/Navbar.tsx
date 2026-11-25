@@ -29,6 +29,7 @@ import { formatRelativeDate } from '../lib/posts';
 import { AppearanceControls } from './AppearanceControls';
 import { Avatar } from './Avatar';
 import { OwnerBadge } from './OwnerBadge';
+import { TramaLogo } from './TramaLogo';
 
 export type AppMode = 'actualidad' | 'comunidad' | 'biblioteca' | 'arcade';
 export type ActiveView = AppMode | 'perfil';
@@ -70,12 +71,55 @@ const NAV_ITEMS: Array<{
   id: ActiveView;
   label: string;
   icon: typeof Newspaper;
+  activeClasses: string;
+  activeIconClass: string;
+  idleHoverIconClass: string;
 }> = [
-  { id: 'actualidad', label: 'Actualidad', icon: Newspaper },
-  { id: 'comunidad', label: 'Comunidad', icon: Users },
-  { id: 'biblioteca', label: 'Biblioteca', icon: BookOpen },
-  { id: 'arcade', label: 'Arcade', icon: Gamepad2 },
-  { id: 'perfil', label: 'Perfil', icon: UserRound },
+  {
+    id: 'actualidad',
+    label: 'Actualidad',
+    icon: Newspaper,
+    activeClasses:
+      'border-cyan-500/45 bg-cyan-500/14 text-cyan-700 dark:text-cyan-300 shadow-[0_6px_20px_-10px_rgba(6,182,212,0.55)]',
+    activeIconClass: 'text-cyan-600 dark:text-cyan-400',
+    idleHoverIconClass: 'group-hover:text-cyan-500',
+  },
+  {
+    id: 'comunidad',
+    label: 'Comunidad',
+    icon: Users,
+    activeClasses:
+      'border-emerald-500/45 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300 shadow-[0_6px_20px_-10px_rgba(16,185,129,0.55)]',
+    activeIconClass: 'text-emerald-600 dark:text-emerald-400',
+    idleHoverIconClass: 'group-hover:text-emerald-500',
+  },
+  {
+    id: 'biblioteca',
+    label: 'Biblioteca',
+    icon: BookOpen,
+    activeClasses:
+      'border-violet-500/45 bg-violet-500/14 text-violet-700 dark:text-violet-300 shadow-[0_6px_20px_-10px_rgba(139,92,246,0.55)]',
+    activeIconClass: 'text-violet-600 dark:text-violet-400',
+    idleHoverIconClass: 'group-hover:text-violet-500',
+  },
+  {
+    id: 'arcade',
+    label: 'Arcade',
+    icon: Gamepad2,
+    activeClasses:
+      'border-orange-500/45 bg-orange-500/14 text-orange-700 dark:text-orange-300 shadow-[0_6px_20px_-10px_rgba(249,115,22,0.55)]',
+    activeIconClass: 'text-orange-600 dark:text-orange-400',
+    idleHoverIconClass: 'group-hover:text-orange-500',
+  },
+  {
+    id: 'perfil',
+    label: 'Perfil',
+    icon: UserRound,
+    activeClasses:
+      'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] shadow-[var(--accent-shadow)]',
+    activeIconClass: 'text-[var(--accent-primary)]',
+    idleHoverIconClass: 'group-hover:text-[var(--accent-primary)]',
+  },
 ];
 
 interface NavbarProps {
@@ -231,23 +275,24 @@ export function Navbar({
   return (
     <>
       {/* Encabezado principal superior */}
-      <header className="relative z-50 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] transition-colors duration-300">
+      <header className="relative z-50 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]/88 backdrop-blur-md transition-colors duration-300">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6">
           <button
             type="button"
             onClick={() => onSelectView('actualidad')}
-            className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded-md px-1 -ml-1"
+            aria-label="Ir al inicio de Trama"
+            className="group inline-flex items-center rounded-xl px-1 -ml-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
           >
-            Trama
+            <TramaLogo size="md" showWordmark />
           </button>
 
           <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
-            {/* Botón "+ Crear" siempre accesible */}
+            {/* Botón "+ Crear" con degradado vivo de la sección activa */}
             <button
               type="button"
               onClick={onOpenCreate}
               aria-label="Crear publicación"
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent-primary)] px-3 py-2 text-xs sm:px-3.5 sm:text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 whitespace-nowrap shrink-0 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+              className="trama-btn-primary min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs sm:px-3.5 sm:text-sm font-semibold whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
             >
               <Plus size={16} strokeWidth={2.5} aria-hidden="true" />
               <span>Crear</span>
@@ -570,10 +615,10 @@ export function Navbar({
         </div>
       </header>
 
-      {/* Barra horizontal superior fija con las 5 secciones (sin colisión con Netlify abajo) */}
+      {/* Barra horizontal superior fija con las 5 secciones (paleta viva por universo) */}
       <nav
         aria-label="Navegación principal"
-        className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]/95 backdrop-blur-md transition-colors duration-300"
+        className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]/90 backdrop-blur-md transition-colors duration-300"
       >
         <div className="mx-auto max-w-6xl px-3 sm:px-6">
           <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-2 sm:gap-2">
@@ -586,20 +631,20 @@ export function Navbar({
                   type="button"
                   onClick={() => onSelectView(item.id)}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                  className={`group min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                     isActive
-                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                      ? item.activeClasses
                       : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                   }`}
                 >
                   <Icon
                     size={17}
                     strokeWidth={isActive ? 2.3 : 1.8}
-                    className={
+                    className={`transition-colors duration-300 ${
                       isActive
-                        ? 'text-[var(--accent-primary)]'
-                        : 'text-[var(--text-muted)]'
-                    }
+                        ? item.activeIconClass
+                        : `text-[var(--text-muted)] ${item.idleHoverIconClass}`
+                    }`}
                     aria-hidden="true"
                   />
                   <span>{item.label}</span>

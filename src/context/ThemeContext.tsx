@@ -16,6 +16,13 @@ import {
 } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
+export type TramaSection =
+  | 'actualidad'
+  | 'comunidad'
+  | 'biblioteca'
+  | 'arcade'
+  | 'perfil';
+
 export interface AppearancePreferences {
   themeMode: ThemeMode;
   accentColor: AccentColor;
@@ -23,6 +30,8 @@ export interface AppearancePreferences {
 }
 
 interface ThemeContextValue extends AppearancePreferences {
+  activeSection: TramaSection;
+  setActiveSection: (section: TramaSection) => void;
   fontSizePx: number;
   isSyncingPrefs: boolean;
   setThemeMode: (mode: ThemeMode) => void;
@@ -82,12 +91,16 @@ function writeLocalPreferences(prefs: AppearancePreferences): void {
   }
 }
 
-function applyAppearanceToDom(prefs: AppearancePreferences): void {
+function applyAppearanceToDom(
+  prefs: AppearancePreferences,
+  section: TramaSection
+): void {
   const root = document.documentElement;
   root.classList.toggle('dark', prefs.themeMode === 'dark');
   root.dataset.theme = prefs.themeMode;
   root.dataset.accent = prefs.accentColor;
   root.dataset.fontSize = prefs.fontSize;
+  root.dataset.section = section;
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
@@ -105,16 +118,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<AppearancePreferences>(() =>
     readLocalPreferences()
   );
+  const [activeSection, setActiveSectionState] =
+    useState<TramaSection>('actualidad');
   const [isSyncingPrefs, setIsSyncingPrefs] = useState(false);
 
   const hydratedUserIdRef = useRef<string | null>(null);
   const prefsRef = useRef<AppearancePreferences>(prefs);
+  const sectionRef = useRef<TramaSection>(activeSection);
 
   useEffect(() => {
     prefsRef.current = prefs;
-    applyAppearanceToDom(prefs);
+    sectionRef.current = activeSection;
+    applyAppearanceToDom(prefs, activeSection);
     writeLocalPreferences(prefs);
-  }, [prefs]);
+  }, [prefs, activeSection]);
 
   // Hidrata preferencias desde Supabase profiles al iniciar sesión
   useEffect(() => {
@@ -193,6 +210,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [user?.id, profile, profileExists, setProfileState]
   );
 
+  const setActiveSection = useCallback((section: TramaSection) => {
+    if (sectionRef.current === section) return;
+    sectionRef.current = section;
+    setActiveSectionState(section);
+    applyAppearanceToDom(prefsRef.current, section);
+  }, []);
+
   const updateAppearance = useCallback(
     (patch: Partial<AppearancePreferences>) => {
       const next: AppearancePreferences = {
@@ -201,7 +225,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       };
       prefsRef.current = next;
       setPrefs(next);
-      applyAppearanceToDom(next);
+      applyAppearanceToDom(next, sectionRef.current);
       writeLocalPreferences(next);
       void persistRemotePreferences(next);
     },
@@ -232,6 +256,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ThemeContextValue>(
     () => ({
       ...prefs,
+      activeSection,
+      setActiveSection,
       fontSizePx: FONT_SIZE_PX_MAP[prefs.fontSize],
       isSyncingPrefs,
       setThemeMode,
@@ -241,6 +267,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }),
     [
       prefs,
+      activeSection,
+      setActiveSection,
       isSyncingPrefs,
       setThemeMode,
       setAccentColor,

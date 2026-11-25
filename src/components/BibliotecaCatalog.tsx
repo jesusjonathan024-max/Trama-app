@@ -24,7 +24,9 @@ import {
   fetchRatingsSummaryMap,
   type SeriesRatingSummary,
 } from '../lib/phase2';
+import { getCategoryVisualTheme } from '../lib/categoryColors';
 import { Avatar } from './Avatar';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
@@ -173,7 +175,7 @@ export function BibliotecaCatalog({
             <button
               type="button"
               onClick={onOpenCreateSeries}
-              className="min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              className="trama-btn-primary min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
               <span>Nueva Obra</span>
@@ -347,10 +349,15 @@ export function BibliotecaCatalog({
             const readingStatus = collection?.status ?? '';
             const isBusy = Boolean(busySeriesIds[series.id]);
 
+            const genreTheme = getCategoryVisualTheme(
+              series.genre,
+              isManhwa ? 'manhwa' : 'novela'
+            );
+
             return (
               <article
                 key={series.id}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left shadow-sm hover:border-[var(--accent-border)] transition-colors duration-300"
+                className="trama-card-glow group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left shadow-sm"
               >
                 {/* Portada vertical 3:4 */}
                 <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--bg-subtle)]">
@@ -368,19 +375,13 @@ export function BibliotecaCatalog({
                         fallbackClassName="h-full w-full"
                       />
                     ) : (
-                      <div
-                        className={`flex h-full w-full flex-col justify-end p-4 ${
-                          isManhwa
-                            ? 'bg-gradient-to-br from-[#2B2012] via-[#171412] to-[#0E1118]'
-                            : 'bg-gradient-to-br from-[#13233C] via-[#111622] to-[#0C0F16]'
-                        }`}
-                      >
-                        <BookOpen
-                          size={28}
-                          className="mb-auto text-white/25"
-                          aria-hidden="true"
-                        />
-                      </div>
+                      <CategoryCoverArtwork
+                        category={series.genre || (isManhwa ? 'Manhwa' : 'Novela')}
+                        title={series.title}
+                        fallbackMode={isManhwa ? 'manhwa' : 'novela'}
+                        variant="portrait"
+                        className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
                     )}
                   </button>
 
@@ -391,10 +392,10 @@ export function BibliotecaCatalog({
                   />
 
                   <span
-                    className={`pointer-events-none absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-wide backdrop-blur-sm ${
+                    className={`pointer-events-none absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm ${
                       isManhwa
-                        ? 'bg-[#B45309]/92 text-[#FEF3C7]'
-                        : 'bg-[#1D4ED8]/92 text-[#DBEAFE]'
+                        ? 'bg-gradient-to-r from-violet-600/95 to-fuchsia-600/95'
+                        : 'bg-gradient-to-r from-indigo-600/95 to-violet-600/95'
                     }`}
                   >
                     {isManhwa ? 'Manhwa' : 'Novela'}
@@ -439,8 +440,10 @@ export function BibliotecaCatalog({
                 {/* ZONA 1 + 2: Cabecera de género, título y selector rápido de estado */}
                 <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
                   <div>
-                    <div className="flex items-center justify-between gap-1.5 text-[11px] font-semibold text-[var(--accent-primary)]">
-                      <span className="truncate">{series.genre}</span>
+                    <div className="flex items-center justify-between gap-1.5 text-[11px] font-bold">
+                      <span className={`truncate ${genreTheme.textClass}`}>
+                        {series.genre}
+                      </span>
                     </div>
 
                     <button

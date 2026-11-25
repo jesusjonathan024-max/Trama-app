@@ -416,7 +416,7 @@ export function ArcadeGameModal({
   onHighScoreUpdated,
 }: ArcadeGameModalProps) {
   const { user } = useAuth();
-  const { accentColor, themeMode } = useTheme();
+  const { accentColor, themeMode, activeSection } = useTheme();
   const { checkArcadeAchievements } = useAchievements();
 
   const [phase, setPhase] = useState<GamePhase>('TITLE_MENU');
@@ -464,11 +464,14 @@ export function ArcadeGameModal({
         .trim();
       if (cssVal) return cssVal;
     }
+    if (activeSection === 'arcade') {
+      return themeMode === 'light' ? '#EA580C' : '#F97316';
+    }
     if (accentColor === 'violet') {
       return themeMode === 'light' ? '#7C3AED' : '#8B5CF6';
     }
-    return themeMode === 'light' ? '#2563EB' : '#3B82F6';
-  }, [accentColor, themeMode]);
+    return themeMode === 'light' ? '#0891B2' : '#06B6D4';
+  }, [accentColor, themeMode, activeSection]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);

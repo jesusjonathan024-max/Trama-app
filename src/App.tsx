@@ -21,7 +21,7 @@ import { SeriesDetailView } from './components/SeriesDetailView';
 import { AchievementProvider } from './context/AchievementContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocialProvider, useSocial } from './context/SocialContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ENABLE_AI_FEATURES, type AiChatContext } from './lib/ai';
 import {
   fetchChaptersBySeries,
@@ -46,6 +46,7 @@ interface ActiveReaderState {
 function AppShell() {
   const { user, isAuthenticated } = useAuth();
   const { socialError, clearSocialError } = useSocial();
+  const { setActiveSection } = useTheme();
 
   const [activeView, setActiveView] = useState<ActiveView>('actualidad');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -93,6 +94,26 @@ function AppShell() {
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [aiContext, setAiContext] = useState<AiChatContext | null>(null);
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | null>(null);
+
+  // Sincroniza el sistema cromático dinámico con la sección visible actual
+  useEffect(() => {
+    if (activeReader || selectedSeries) {
+      setActiveSection('biblioteca');
+    } else if (selectedPost) {
+      setActiveSection(selectedPost.mode);
+    } else if (selectedProfileId) {
+      setActiveSection('perfil');
+    } else {
+      setActiveSection(activeView);
+    }
+  }, [
+    activeView,
+    selectedPost,
+    selectedSeries,
+    selectedProfileId,
+    activeReader,
+    setActiveSection,
+  ]);
 
   const refreshUnreadDms = useCallback(async () => {
     if (!user?.id) {
@@ -360,7 +381,13 @@ function AppShell() {
     (activeView === 'actualidad' || activeView === 'comunidad');
 
   return (
-    <div className="min-h-dvh bg-[var(--bg-base)] text-[var(--text-main)] flex flex-col transition-colors duration-300">
+    <div className="relative min-h-dvh overflow-x-clip bg-[var(--bg-base)] text-[var(--text-main)] flex flex-col transition-colors duration-300">
+      {/* Resplandor radial ambiental (Trama Dark) y tinte suave 5% (Trama Light) */}
+      <div
+        aria-hidden="true"
+        className="trama-ambient-layer pointer-events-none fixed inset-x-0 top-0 z-0 h-[460px]"
+      />
+
       <Navbar
         activeView={activeView}
         onSelectView={handleSelectView}
@@ -390,7 +417,7 @@ function AppShell() {
         </div>
       )}
 
-      <main className="flex-1">
+      <main className="relative z-10 flex-1">
         {selectedPost ? (
           <PostDetailView
             initialPost={selectedPost}
@@ -488,7 +515,7 @@ function AppShell() {
           onClick={() => setIsCreatePostModalOpen(true)}
           aria-label="Crear publicación"
           title="Crear publicación"
-          className="fixed bottom-5 left-4 z-30 flex h-13 w-13 items-center justify-center rounded-2xl bg-[var(--accent-primary)] text-[var(--accent-fg)] shadow-lg hover:bg-[var(--accent-hover)] active:scale-95 transition-all duration-300 md:bottom-6 md:left-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+          className="trama-btn-primary fixed bottom-5 left-4 z-30 flex h-13 w-13 items-center justify-center rounded-2xl md:bottom-6 md:left-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
         >
           <Plus size={24} strokeWidth={2.4} aria-hidden="true" />
         </button>

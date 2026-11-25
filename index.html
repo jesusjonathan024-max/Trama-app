@@ -8,6 +8,8 @@
       name="description"
       content="Explora artículos de Actualidad, debates en Comunidad, novelas y manhwas en Biblioteca y minijuegos en el Arcade de Trama."
     />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="canonical" href="https://trama-app.netlify.app" />
 
     <!-- Open Graph / WhatsApp / Discord / Redes Sociales -->
@@ -46,6 +48,7 @@
           root.dataset.theme = mode;
           root.dataset.accent = accent;
           root.dataset.fontSize = font;
+          root.dataset.section = 'actualidad';
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
             meta.setAttribute('content', mode === 'dark' ? '#0F1115' : '#F8FAFC');
@@ -55,6 +58,7 @@
           document.documentElement.dataset.theme = 'dark';
           document.documentElement.dataset.accent = 'blue';
           document.documentElement.dataset.fontSize = 'normal';
+          document.documentElement.dataset.section = 'actualidad';
         }
       })();
     </script>
@@ -78,7 +82,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
   </head>

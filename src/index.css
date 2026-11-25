@@ -6,7 +6,9 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Trama Light (por defecto cuando no tiene clase .dark) */
+/* ============================================================================
+   TRAMA LIGHT (Base #F8FAFC + tintes suaves 5% por sección + sombras con acento)
+   ============================================================================ */
 :root {
   color-scheme: light;
   --bg-base: #f8fafc;
@@ -18,26 +20,123 @@
   --text-secondary: #475569;
   --text-muted: #64748b;
 
-  /* Acento Azul en Trama Light */
-  --accent-primary: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: rgba(37, 99, 235, 0.1);
-  --accent-border: rgba(37, 99, 235, 0.32);
+  /* Paleta base por defecto (Actualidad: Cian Eléctrico + Azul Cielo) */
+  --accent-primary: #0891b2;
+  --accent-secondary: #0284c7;
+  --accent-hover: #0e7490;
+  --accent-soft: rgba(6, 182, 212, 0.11);
+  --accent-border: rgba(6, 182, 212, 0.42);
   --accent-fg: #ffffff;
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #0891b2 0%, #0369a1 100%);
+  --accent-glow: rgba(6, 182, 212, 0.24);
+  --accent-shadow: 0 10px 28px -12px rgba(6, 182, 212, 0.32);
+  --section-tint: rgba(6, 182, 212, 0.05);
+  --section-ambient-a: rgba(6, 182, 212, 0.09);
+  --section-ambient-b: rgba(2, 132, 199, 0.05);
 
   /* Tamaño de lectura dinámico */
   --reading-font-size: 16px;
 }
 
-:root[data-accent="violet"] {
-  --accent-primary: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-soft: rgba(124, 58, 237, 0.1);
-  --accent-border: rgba(124, 58, 237, 0.34);
-  --accent-fg: #ffffff;
+/* Trama Light — Actualidad: Cian Eléctrico (#06B6D4) y Azul Cielo (#0284C7) */
+:root[data-section="actualidad"] {
+  --accent-primary: #0891b2;
+  --accent-secondary: #0284c7;
+  --accent-hover: #0e7490;
+  --accent-soft: rgba(6, 182, 212, 0.11);
+  --accent-border: rgba(6, 182, 212, 0.42);
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #0891b2 0%, #0369a1 100%);
+  --accent-glow: rgba(6, 182, 212, 0.25);
+  --accent-shadow: 0 10px 28px -12px rgba(6, 182, 212, 0.34);
+  --section-tint: rgba(6, 182, 212, 0.05);
+  --section-ambient-a: rgba(6, 182, 212, 0.09);
+  --section-ambient-b: rgba(2, 132, 199, 0.05);
 }
 
-/* Trama Dark (tema por defecto de la aplicación) */
+/* Trama Light — Comunidad: Verde Esmeralda (#10B981) y Turquesa (#0D9488) */
+:root[data-section="comunidad"] {
+  --accent-primary: #059669;
+  --accent-secondary: #0d9488;
+  --accent-hover: #047857;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-border: rgba(16, 185, 129, 0.42);
+  --accent-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #059669 0%, #0f766e 100%);
+  --accent-glow: rgba(16, 185, 129, 0.24);
+  --accent-shadow: 0 10px 28px -12px rgba(16, 185, 129, 0.34);
+  --section-tint: rgba(16, 185, 129, 0.05);
+  --section-ambient-a: rgba(16, 185, 129, 0.09);
+  --section-ambient-b: rgba(13, 148, 136, 0.05);
+}
+
+/* Trama Light — Biblioteca: Violeta Neón (#8B5CF6) y Magenta (#EC4899) */
+:root[data-section="biblioteca"] {
+  --accent-primary: #7c3aed;
+  --accent-secondary: #db2777;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(139, 92, 246, 0.12);
+  --accent-border: rgba(139, 92, 246, 0.42);
+  --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  --accent-glow: rgba(139, 92, 246, 0.25);
+  --accent-shadow: 0 10px 28px -12px rgba(139, 92, 246, 0.34);
+  --section-tint: rgba(139, 92, 246, 0.05);
+  --section-ambient-a: rgba(139, 92, 246, 0.09);
+  --section-ambient-b: rgba(236, 72, 153, 0.05);
+}
+
+/* Trama Light — Arcade: Naranja Coral (#F97316) y Rojo Neón (#F43F5E) */
+:root[data-section="arcade"] {
+  --accent-primary: #ea580c;
+  --accent-secondary: #e11d48;
+  --accent-hover: #c2410c;
+  --accent-soft: rgba(249, 115, 22, 0.12);
+  --accent-border: rgba(249, 115, 22, 0.44);
+  --accent-gradient: linear-gradient(135deg, #f97316 0%, #f43f5e 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #ea580c 0%, #e11d48 100%);
+  --accent-glow: rgba(249, 115, 22, 0.26);
+  --accent-shadow: 0 10px 28px -12px rgba(249, 115, 22, 0.34);
+  --section-tint: rgba(249, 115, 22, 0.05);
+  --section-ambient-a: rgba(249, 115, 22, 0.09);
+  --section-ambient-b: rgba(244, 63, 94, 0.05);
+}
+
+/* Trama Light — Perfil respeta la preferencia personal Azul / Violeta */
+:root[data-section="perfil"][data-accent="blue"] {
+  --accent-primary: #2563eb;
+  --accent-secondary: #06b6d4;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.11);
+  --accent-border: rgba(37, 99, 235, 0.38);
+  --accent-gradient: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
+  --accent-glow: rgba(37, 99, 235, 0.24);
+  --accent-shadow: 0 10px 28px -12px rgba(37, 99, 235, 0.32);
+  --section-tint: rgba(37, 99, 235, 0.05);
+  --section-ambient-a: rgba(37, 99, 235, 0.09);
+  --section-ambient-b: rgba(6, 182, 212, 0.05);
+}
+
+:root[data-section="perfil"][data-accent="violet"] {
+  --accent-primary: #7c3aed;
+  --accent-secondary: #ec4899;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.11);
+  --accent-border: rgba(124, 58, 237, 0.4);
+  --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #6d28d9 0%, #db2777 100%);
+  --accent-glow: rgba(124, 58, 237, 0.25);
+  --accent-shadow: 0 10px 28px -12px rgba(124, 58, 237, 0.34);
+  --section-tint: rgba(124, 58, 237, 0.05);
+  --section-ambient-a: rgba(124, 58, 237, 0.09);
+  --section-ambient-b: rgba(236, 72, 153, 0.05);
+}
+
+/* ============================================================================
+   TRAMA DARK (Base #0F1115 + resplandor radial ambiental + bordes luminosos)
+   ============================================================================ */
 :root.dark {
   color-scheme: dark;
   --bg-base: #0f1115;
@@ -49,20 +148,115 @@
   --text-secondary: #a1a9b8;
   --text-muted: #7c8596;
 
-  /* Acento Azul en Trama Dark */
-  --accent-primary: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-soft: rgba(59, 130, 246, 0.15);
-  --accent-border: rgba(59, 130, 246, 0.4);
+  /* Paleta base por defecto en Dark (Actualidad: Cian Eléctrico + Azul Cielo) */
+  --accent-primary: #06b6d4;
+  --accent-secondary: #0284c7;
+  --accent-hover: #22d3ee;
+  --accent-soft: rgba(6, 182, 212, 0.15);
+  --accent-border: rgba(6, 182, 212, 0.45);
   --accent-fg: #ffffff;
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%);
+  --accent-glow: rgba(6, 182, 212, 0.32);
+  --accent-shadow: 0 14px 36px -14px rgba(6, 182, 212, 0.42);
+  --section-tint: rgba(6, 182, 212, 0.07);
+  --section-ambient-a: rgba(6, 182, 212, 0.22);
+  --section-ambient-b: rgba(2, 132, 199, 0.1);
 }
 
-:root.dark[data-accent="violet"] {
+/* Trama Dark — Actualidad: Cian Eléctrico (#06B6D4) y Azul Cielo (#0284C7) */
+:root.dark[data-section="actualidad"] {
+  --accent-primary: #06b6d4;
+  --accent-secondary: #0284c7;
+  --accent-hover: #22d3ee;
+  --accent-soft: rgba(6, 182, 212, 0.16);
+  --accent-border: rgba(6, 182, 212, 0.46);
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%);
+  --accent-glow: rgba(6, 182, 212, 0.34);
+  --accent-shadow: 0 14px 36px -14px rgba(6, 182, 212, 0.44);
+  --section-tint: rgba(6, 182, 212, 0.07);
+  --section-ambient-a: rgba(6, 182, 212, 0.22);
+  --section-ambient-b: rgba(2, 132, 199, 0.1);
+}
+
+/* Trama Dark — Comunidad: Verde Esmeralda (#10B981) y Turquesa (#0D9488) */
+:root.dark[data-section="comunidad"] {
+  --accent-primary: #10b981;
+  --accent-secondary: #0d9488;
+  --accent-hover: #34d399;
+  --accent-soft: rgba(16, 185, 129, 0.16);
+  --accent-border: rgba(16, 185, 129, 0.46);
+  --accent-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #34d399 0%, #14b8a6 100%);
+  --accent-glow: rgba(16, 185, 129, 0.34);
+  --accent-shadow: 0 14px 36px -14px rgba(16, 185, 129, 0.44);
+  --section-tint: rgba(16, 185, 129, 0.07);
+  --section-ambient-a: rgba(16, 185, 129, 0.22);
+  --section-ambient-b: rgba(13, 148, 136, 0.1);
+}
+
+/* Trama Dark — Biblioteca: Violeta Neón (#8B5CF6) y Magenta (#EC4899) */
+:root.dark[data-section="biblioteca"] {
   --accent-primary: #8b5cf6;
+  --accent-secondary: #ec4899;
   --accent-hover: #a78bfa;
-  --accent-soft: rgba(139, 92, 246, 0.16);
-  --accent-border: rgba(139, 92, 246, 0.42);
-  --accent-fg: #ffffff;
+  --accent-soft: rgba(139, 92, 246, 0.17);
+  --accent-border: rgba(139, 92, 246, 0.48);
+  --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+  --accent-glow: rgba(139, 92, 246, 0.36);
+  --accent-shadow: 0 14px 36px -14px rgba(139, 92, 246, 0.46);
+  --section-tint: rgba(139, 92, 246, 0.08);
+  --section-ambient-a: rgba(139, 92, 246, 0.24);
+  --section-ambient-b: rgba(236, 72, 153, 0.11);
+}
+
+/* Trama Dark — Arcade: Naranja Coral (#F97316) y Rojo Neón (#F43F5E) */
+:root.dark[data-section="arcade"] {
+  --accent-primary: #f97316;
+  --accent-secondary: #f43f5e;
+  --accent-hover: #fb923c;
+  --accent-soft: rgba(249, 115, 22, 0.17);
+  --accent-border: rgba(249, 115, 22, 0.48);
+  --accent-gradient: linear-gradient(135deg, #f97316 0%, #f43f5e 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #fb923c 0%, #fb7185 100%);
+  --accent-glow: rgba(249, 115, 22, 0.36);
+  --accent-shadow: 0 14px 36px -14px rgba(249, 115, 22, 0.46);
+  --section-tint: rgba(249, 115, 22, 0.08);
+  --section-ambient-a: rgba(249, 115, 22, 0.24);
+  --section-ambient-b: rgba(244, 63, 94, 0.11);
+}
+
+/* Trama Dark — Perfil respeta la preferencia personal Azul / Violeta */
+:root.dark[data-section="perfil"][data-accent="blue"] {
+  --accent-primary: #3b82f6;
+  --accent-secondary: #06b6d4;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.16);
+  --accent-border: rgba(59, 130, 246, 0.44);
+  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #60a5fa 0%, #22d3ee 100%);
+  --accent-glow: rgba(59, 130, 246, 0.34);
+  --accent-shadow: 0 14px 36px -14px rgba(59, 130, 246, 0.44);
+  --section-tint: rgba(59, 130, 246, 0.07);
+  --section-ambient-a: rgba(59, 130, 246, 0.22);
+  --section-ambient-b: rgba(6, 182, 212, 0.1);
+}
+
+:root.dark[data-section="perfil"][data-accent="violet"] {
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #ec4899;
+  --accent-hover: #a78bfa;
+  --accent-soft: rgba(139, 92, 246, 0.17);
+  --accent-border: rgba(139, 92, 246, 0.46);
+  --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+  --accent-glow: rgba(139, 92, 246, 0.36);
+  --accent-shadow: 0 14px 36px -14px rgba(139, 92, 246, 0.46);
+  --section-tint: rgba(139, 92, 246, 0.08);
+  --section-ambient-a: rgba(139, 92, 246, 0.24);
+  --section-ambient-b: rgba(236, 72, 153, 0.1);
 }
 
 /* Escala tipográfica de lectura (Normal 16px, Grande 18px, Lectura XL 20px) */
@@ -105,6 +299,55 @@
   h3 {
     font-family: var(--font-display);
   }
+}
+
+/* Resplandor radial ambiental superior (Dark) y tinte suave 5% (Light) */
+.trama-ambient-layer {
+  background:
+    radial-gradient(
+      68% 420px at 50% -40px,
+      var(--section-ambient-a) 0%,
+      var(--section-ambient-b) 42%,
+      transparent 78%
+    ),
+    linear-gradient(180deg, var(--section-tint) 0%, transparent 320px);
+  transition: opacity 400ms ease, background 450ms ease;
+}
+
+/* Botón primario con degradado vivo acorde a la sección activa */
+.trama-btn-primary {
+  background-image: var(--accent-gradient);
+  color: #ffffff;
+  box-shadow: var(--accent-shadow);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 200ms ease,
+    box-shadow 250ms ease;
+}
+
+.trama-btn-primary:hover:not(:disabled) {
+  background-image: var(--accent-gradient-hover);
+  filter: brightness(1.04);
+  box-shadow: 0 12px 30px -10px var(--accent-glow);
+}
+
+.trama-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Tarjeta interactiva con borde luminoso sutil y sombra acentuada al hover */
+.trama-card-glow {
+  transition: border-color 280ms ease, box-shadow 280ms ease,
+    background-color 300ms ease, transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.trama-card-glow:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--accent-shadow);
+}
+
+/* Superficie teñida con el 5% de la sección activa */
+.trama-section-tint {
+  background-color: var(--section-tint);
 }
 
 .reading-prose {

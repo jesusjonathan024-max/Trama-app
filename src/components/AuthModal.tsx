@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { TramaLogo } from './TramaLogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -148,6 +149,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
 
         <div className="flex items-start justify-between gap-4">
           <div>
+            <TramaLogo size="sm" showWordmark className="mb-3" />
             <h2
               id="auth-modal-title"
               className="font-display text-2xl font-bold tracking-tight text-[var(--text-main)]"
@@ -279,7 +281,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 min-h-[48px] w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]"
+            className="trama-btn-primary mt-2 min-h-[48px] w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]"
           >
             {isSubmitting ? (
               <>

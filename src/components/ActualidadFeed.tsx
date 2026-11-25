@@ -37,7 +37,9 @@ import {
   type PostRecord,
 } from '../lib/posts';
 import { sortPostsByMode, type FeedSortMode } from '../lib/social';
+import { getCategoryVisualTheme } from '../lib/categoryColors';
 import { Avatar } from './Avatar';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { EditPostModal } from './EditPostModal';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
@@ -510,36 +512,36 @@ export function ActualidadFeed({
         <div className="mt-8 space-y-8">
           {/* Portada destacada superior (3 zonas: Cabecera, Cuerpo, Pie) */}
           <article
-            className={`group overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm transition-colors duration-300 ${
+            className={`trama-card-glow group grid grid-cols-1 lg:grid-cols-12 items-stretch overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm ${
               leadArticle.is_pinned
-                ? 'border-amber-500/45 dark:border-amber-400/40'
-                : 'border-[var(--border-subtle)] hover:border-[var(--accent-border)]'
-            } ${
-              leadArticle.image_url
-                ? 'grid grid-cols-1 lg:grid-cols-12 items-stretch'
-                : 'p-6 sm:p-8'
+                ? 'border-amber-500/50 dark:border-amber-400/45'
+                : 'border-[var(--border-subtle)]'
             }`}
           >
-            {leadArticle.image_url && (
-              <button
-                type="button"
-                onClick={() => onSelectPost(leadArticle)}
-                className="block w-full overflow-hidden bg-[var(--bg-subtle)] text-left lg:col-span-7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
-              >
+            <button
+              type="button"
+              onClick={() => onSelectPost(leadArticle)}
+              className="block w-full overflow-hidden bg-[var(--bg-subtle)] text-left lg:col-span-7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
+            >
+              {leadArticle.image_url ? (
                 <MediaImage
                   src={leadArticle.image_url}
                   alt={leadArticle.title || 'Portada del artículo destacado'}
                   className="h-60 w-full object-cover transition-transform duration-300 group-hover:scale-[1.015] sm:h-80 lg:h-full lg:min-h-[380px]"
                   fallbackClassName="h-60 w-full sm:h-80 lg:h-full lg:min-h-[380px]"
                 />
-              </button>
-            )}
+              ) : (
+                <CategoryCoverArtwork
+                  category={leadArticle.category}
+                  title={leadArticle.title}
+                  fallbackMode="actualidad"
+                  variant="hero"
+                  className="h-60 w-full transition-transform duration-300 group-hover:scale-[1.015] sm:h-80 lg:h-full lg:min-h-[380px]"
+                />
+              )}
+            </button>
 
-            <div
-              className={`flex flex-col justify-between ${
-                leadArticle.image_url ? 'p-5 sm:p-7 lg:col-span-5' : 'max-w-3xl'
-              }`}
-            >
+            <div className="flex flex-col justify-between p-5 sm:p-7 lg:col-span-5">
               {/* ZONA 1: CABECERA (Avatar, Autor, Insignia, Categoría y Fecha) */}
               <div>
                 <div className="flex items-start justify-between gap-2.5">
@@ -576,8 +578,10 @@ export function ActualidadFeed({
                           size="xs"
                         />
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
-                        <span className="font-semibold text-[var(--accent-primary)]">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                        <span
+                          className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${getCategoryVisualTheme(leadArticle.category, 'actualidad').labelClass}`}
+                        >
                           {leadArticle.category}
                         </span>
                         <span aria-hidden="true">·</span>
@@ -686,7 +690,7 @@ export function ActualidadFeed({
                       type="button"
                       onClick={() => onSelectPost(leadArticle)}
                       aria-label="Abrir comentarios del artículo"
-                      className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                      className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-sky-500/12 hover:text-sky-600 dark:hover:text-sky-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                     >
                       <MessageSquare size={15} aria-hidden="true" />
                       <span className="tabular-nums">
@@ -706,8 +710,8 @@ export function ActualidadFeed({
                       }
                       className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                         isPostSaved(leadArticle.id)
-                          ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          : 'text-[var(--text-secondary)] hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
                       }`}
                     >
                       <Bookmark
@@ -864,27 +868,35 @@ export function ActualidadFeed({
                 return (
                   <article
                     key={article.id}
-                    className={`group flex flex-col justify-between overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm transition-colors duration-300 ${
+                    className={`trama-card-glow group flex flex-col justify-between overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm ${
                       article.is_pinned
-                        ? 'border-amber-500/45 dark:border-amber-400/40'
-                        : 'border-[var(--border-subtle)] hover:border-[var(--accent-border)]'
+                        ? 'border-amber-500/50 dark:border-amber-400/45'
+                        : 'border-[var(--border-subtle)]'
                     }`}
                   >
                     <div>
-                      {article.image_url && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectPost(article)}
-                          className="block w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
-                        >
+                      <button
+                        type="button"
+                        onClick={() => onSelectPost(article)}
+                        className="block w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
+                      >
+                        {article.image_url ? (
                           <MediaImage
                             src={article.image_url}
                             alt={article.title || 'Imagen del artículo'}
                             className="aspect-[16/9] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                             fallbackClassName="aspect-[16/9] w-full"
                           />
-                        </button>
-                      )}
+                        ) : (
+                          <CategoryCoverArtwork
+                            category={article.category}
+                            title={article.title}
+                            fallbackMode="actualidad"
+                            variant="card"
+                            className="aspect-[16/9] w-full transition-transform duration-300 group-hover:scale-[1.02]"
+                          />
+                        )}
+                      </button>
 
                       <div className="p-5">
                         {/* ZONA 1: CABECERA */}
@@ -922,8 +934,10 @@ export function ActualidadFeed({
                                   size="xs"
                                 />
                               </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
-                                <span className="font-semibold text-[var(--accent-primary)]">
+                              <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                                <span
+                                  className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${getCategoryVisualTheme(article.category, 'actualidad').labelClass}`}
+                                >
                                   {article.category}
                                 </span>
                                 <span aria-hidden="true">·</span>
@@ -1035,7 +1049,7 @@ export function ActualidadFeed({
                             type="button"
                             onClick={() => onSelectPost(article)}
                             aria-label="Abrir comentarios del artículo"
-                            className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                            className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-sky-500/12 hover:text-sky-600 dark:hover:text-sky-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                           >
                             <MessageSquare size={15} aria-hidden="true" />
                             <span className="tabular-nums">
@@ -1055,8 +1069,8 @@ export function ActualidadFeed({
                             }
                             className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                               isPostSaved(article.id)
-                                ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                : 'text-[var(--text-secondary)] hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
                             }`}
                           >
                             <Bookmark

@@ -707,7 +707,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
         {/* Tarjeta destacada: Reto del Día */}
         <div
           aria-labelledby="daily-challenge-heading"
-          className={`flex flex-col justify-between rounded-2xl border bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300 lg:col-span-7 ${
+          className={`trama-card-glow flex flex-col justify-between rounded-2xl border bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm lg:col-span-7 ${
             isDailyCompleted
               ? 'border-emerald-500/45'
               : 'border-[var(--accent-border)]'
@@ -794,7 +794,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
               <button
                 type="button"
                 onClick={() => setActiveGame(dailyChallengeGame)}
-                className="min-h-[42px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-xs font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all whitespace-nowrap"
+                className="trama-btn-primary min-h-[42px] inline-flex items-center gap-2 rounded-xl px-4 text-xs font-bold whitespace-nowrap"
               >
                 <Play size={14} className="fill-current" aria-hidden="true" />
                 <span>
@@ -873,7 +873,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
 
       {/* Juego destacado arriba */}
       {featuredGame && (
-        <article className="mt-7 overflow-hidden rounded-2xl border border-amber-500/35 bg-[var(--bg-card)] shadow-sm transition-colors duration-300">
+        <article className="trama-card-glow mt-7 overflow-hidden rounded-2xl border border-[var(--accent-border)] bg-[var(--bg-card)] shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-12">
             <div className="lg:col-span-6">
               <div className="h-full [&>div]:h-full [&>div]:min-h-[220px] [&>div]:border-b lg:[&>div]:border-b-0 lg:[&>div]:border-r">
@@ -930,7 +930,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
                 <button
                   type="button"
                   onClick={() => setActiveGame(featuredGame)}
-                  className="min-h-[46px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all"
+                  className="trama-btn-primary min-h-[46px] inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold"
                 >
                   <Play size={16} className="fill-current" aria-hidden="true" />
                   <span>Jugar ahora</span>
@@ -989,10 +989,10 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
             {catalogGames.map((game) => (
               <article
                 key={game.id}
-                className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm transition-colors duration-300 ${
+                className={`trama-card-glow overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm ${
                   game.isHidden
                     ? 'border-dashed border-[var(--border-subtle)] opacity-65'
-                    : 'border-[var(--border-subtle)] hover:border-[var(--accent-border)]'
+                    : 'border-[var(--border-subtle)]'
                 }`}
               >
                 <GamePreviewArtwork game={game} />
@@ -1039,7 +1039,7 @@ export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
                     <button
                       type="button"
                       onClick={() => setActiveGame(game)}
-                      className="min-h-[44px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all"
+                      className="trama-btn-primary min-h-[44px] inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold"
                     >
                       <Play size={15} className="fill-current" aria-hidden="true" />
                       <span>Jugar</span>

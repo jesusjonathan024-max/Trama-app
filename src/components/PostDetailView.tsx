@@ -43,7 +43,9 @@ import {
   togglePostVerified,
   type PostRecord,
 } from '../lib/posts';
+import { getCategoryVisualTheme } from '../lib/categoryColors';
 import { Avatar } from './Avatar';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { CommentSection } from './CommentSection';
 import { EditPostModal } from './EditPostModal';
 import { FollowButton } from './FollowButton';
@@ -464,7 +466,11 @@ export function PostDetailView({
                 </span>
               </>
             )}
-            <span className="font-semibold">{post.category}</span>
+            <span
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold tracking-wide ${getCategoryVisualTheme(post.category, 'actualidad').labelClass}`}
+            >
+              {post.category}
+            </span>
             <span aria-hidden="true" className="text-[var(--text-muted)]">
               ·
             </span>
@@ -654,16 +660,24 @@ export function PostDetailView({
             </div>
           )}
 
-          {post.image_url && (
-            <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+          <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-sm">
+            {post.image_url ? (
               <MediaImage
                 src={post.image_url}
                 alt={post.title || 'Imagen de portada del artículo'}
                 className="max-h-[480px] w-full object-cover"
                 fallbackClassName="h-64 w-full"
               />
-            </div>
-          )}
+            ) : (
+              <CategoryCoverArtwork
+                category={post.category}
+                title={post.title}
+                fallbackMode="actualidad"
+                variant="hero"
+                className="h-56 sm:h-72 w-full"
+              />
+            )}
+          </div>
 
           <div className="mx-auto mt-8 max-w-[68ch] reading-prose text-[var(--text-main)] whitespace-pre-line break-words">
             {post.content}
@@ -701,8 +715,8 @@ export function PostDetailView({
               aria-pressed={saved}
               className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                 saved
-                  ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                  : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                  ? 'border-amber-500/45 bg-amber-500/14 text-amber-700 dark:text-amber-300'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
               }`}
             >
               <Bookmark
@@ -784,7 +798,9 @@ export function PostDetailView({
                   <span aria-hidden="true" className="text-[var(--text-muted)]">
                     ·
                   </span>
-                  <span className="text-xs font-semibold text-[var(--accent-primary)]">
+                  <span
+                    className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${getCategoryVisualTheme(post.category, 'comunidad').labelClass}`}
+                  >
                     {post.category}
                   </span>
                   <span aria-hidden="true" className="text-[var(--text-muted)]">
@@ -820,7 +836,7 @@ export function PostDetailView({
             />
           </p>
 
-          {post.image_url && (
+          {post.image_url ? (
             <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
               <MediaImage
                 src={post.image_url}
@@ -829,7 +845,17 @@ export function PostDetailView({
                 fallbackClassName="h-56 w-full"
               />
             </div>
-          )}
+          ) : post.title ? (
+            <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+              <CategoryCoverArtwork
+                category={post.category}
+                title={post.title}
+                fallbackMode="comunidad"
+                variant="compact"
+                className="h-36 sm:h-44 w-full"
+              />
+            </div>
+          ) : null}
 
           {poll && (
             <PollCard
@@ -872,8 +898,8 @@ export function PostDetailView({
                 aria-pressed={saved}
                 className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   saved
-                    ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    ? 'border-amber-500/45 bg-amber-500/14 text-amber-700 dark:text-amber-300'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
                 }`}
               >
                 <Bookmark

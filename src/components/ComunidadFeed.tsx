@@ -51,7 +51,12 @@ import {
   type PostRecord,
 } from '../lib/posts';
 import { sortPostsByMode, type FeedSortMode } from '../lib/social';
+import {
+  getCategoryVisualTheme,
+  getHashtagTone,
+} from '../lib/categoryColors';
 import { Avatar } from './Avatar';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { CreateCommunityModal } from './CreateCommunityModal';
 import { EditPostModal } from './EditPostModal';
 import { FollowButton } from './FollowButton';
@@ -689,22 +694,21 @@ export function ComunidadFeed({
                 const isSelected =
                   selectedHashtag !== null &&
                   normalizeHashtag(selectedHashtag) === tag.key;
+                const tone = getHashtagTone(tag.display);
                 return (
                   <button
                     key={tag.key}
                     type="button"
                     onClick={() => handleSelectHashtagChip(tag.display)}
                     aria-pressed={isSelected}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                      isSelected
-                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-fg)]'
-                        : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--accent-primary)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]'
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isSelected ? tone.chipActive : tone.chipIdle
                     }`}
                   >
                     <span>{tag.display}</span>
                     <span
                       className={`text-[10px] tabular-nums ${
-                        isSelected ? 'opacity-90' : 'text-[var(--text-muted)]'
+                        isSelected ? 'opacity-90' : 'opacity-70'
                       }`}
                     >
                       {tag.count}
@@ -867,10 +871,10 @@ export function ComunidadFeed({
             return (
               <article
                 key={thread.id}
-                className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm transition-colors duration-300 ${
+                className={`trama-card-glow overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm ${
                   thread.is_pinned
-                    ? 'border-amber-500/45 dark:border-amber-400/40'
-                    : 'border-[var(--border-subtle)] hover:border-[var(--accent-border)]'
+                    ? 'border-amber-500/50 dark:border-amber-400/45'
+                    : 'border-[var(--border-subtle)]'
                 }`}
               >
                 {/* ZONA 1: CABECERA */}
@@ -911,8 +915,10 @@ export function ComunidadFeed({
                             size="xs"
                           />
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--text-muted)]">
-                          <span className="font-semibold text-[var(--accent-primary)]">
+                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[var(--text-muted)]">
+                          <span
+                            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${getCategoryVisualTheme(thread.category, 'comunidad').labelClass}`}
+                          >
                             {thread.category}
                           </span>
                           {thread.community_id &&
@@ -989,7 +995,7 @@ export function ComunidadFeed({
                     />
                   </div>
 
-                  {thread.image_url && (
+                  {thread.image_url ? (
                     <button
                       type="button"
                       onClick={() => onSelectPost(thread)}
@@ -1002,7 +1008,21 @@ export function ComunidadFeed({
                         fallbackClassName="h-48 w-full"
                       />
                     </button>
-                  )}
+                  ) : thread.title ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPost(thread)}
+                      className="mt-3.5 block w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                    >
+                      <CategoryCoverArtwork
+                        category={thread.category}
+                        title={thread.title}
+                        fallbackMode="comunidad"
+                        variant="compact"
+                        className="h-28 sm:h-32 w-full"
+                      />
+                    </button>
+                  ) : null}
 
                   {pollsByPostId[thread.id] && (
                     <PollCard
@@ -1056,7 +1076,7 @@ export function ComunidadFeed({
                         type="button"
                         onClick={() => onSelectPost(thread)}
                         aria-label="Ver y responder comentarios"
-                        className="min-h-[42px] inline-flex items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                        className="min-h-[42px] inline-flex items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[var(--text-secondary)] hover:bg-emerald-500/12 hover:text-emerald-600 dark:hover:text-emerald-300 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                       >
                         <MessageSquare size={16} aria-hidden="true" />
                         <span className="tabular-nums">
@@ -1077,8 +1097,8 @@ export function ComunidadFeed({
                         }
                         className={`min-h-[42px] inline-flex items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                           isPostSaved(thread.id)
-                            ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            : 'text-[var(--text-secondary)] hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
                         }`}
                       >
                         <Bookmark
