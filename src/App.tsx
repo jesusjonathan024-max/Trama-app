@@ -196,7 +196,7 @@ function AppShell() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1">
         {selectedPost ? (
           <PostDetailView
             initialPost={selectedPost}
@@ -267,7 +267,7 @@ function AppShell() {
           onClick={() => setIsCreatePostModalOpen(true)}
           aria-label="Crear publicación"
           title="Crear publicación"
-          className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#388BFF] text-[#06101F] shadow-lg shadow-[#388BFF]/25 hover:bg-[#529BFF] active:scale-95 transition-all duration-150 md:bottom-8 md:right-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#090B0E]"
+          className="fixed bottom-16 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#388BFF] text-[#06101F] shadow-lg shadow-[#388BFF]/25 hover:bg-[#529BFF] active:scale-95 transition-all duration-150 md:bottom-16 md:right-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#090B0E]"
         >
           <Plus size={26} strokeWidth={2.4} aria-hidden="true" />
         </button>
