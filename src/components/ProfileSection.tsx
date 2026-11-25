@@ -1094,7 +1094,11 @@ export function ProfileSection({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 text-[11px]">
                               <span className="font-semibold text-[var(--accent-primary)]">
-                                {series.type === 'manhwa' ? 'Manhwa' : 'Novela'}
+                                {series.type === 'manga'
+                                  ? 'Manga'
+                                  : series.type === 'manhwa'
+                                    ? 'Manhwa'
+                                    : 'Novela'}
                               </span>
                               <span
                                 aria-hidden="true"
@@ -1260,8 +1264,12 @@ export function ProfileSection({
                             {series.title}
                           </p>
                           <p className="text-[11px] text-[var(--text-muted)]">
-                            {series.type === 'manhwa' ? 'Manhwa' : 'Novela'} ·{' '}
-                            {series.chapters_count}{' '}
+                            {series.type === 'manga'
+                              ? 'Manga'
+                              : series.type === 'manhwa'
+                                ? 'Manhwa'
+                                : 'Novela'}{' '}
+                            · {series.chapters_count}{' '}
                             {series.chapters_count === 1 ? 'cap.' : 'caps.'}
                           </p>
                         </button>

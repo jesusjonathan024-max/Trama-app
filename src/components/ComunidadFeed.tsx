@@ -39,12 +39,13 @@ import {
   type CommunityRecord,
 } from '../lib/phase4';
 import {
-  COMUNIDAD_CATEGORIES,
+  THEMATIC_CATEGORIES,
   deletePost,
   estimateReadMinutes,
   fetchPostsByMode,
   formatRelativeDate,
   getAuthorDisplayName,
+  matchesThematicCategory,
   sortPostsWithPinnedFirst,
   togglePostLike,
   togglePostPin,
@@ -65,6 +66,7 @@ import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 import { PollCard } from './PollCard';
 import { ReportPostModal } from './ReportPostModal';
+import { ThematicCategoryIcon } from './ThematicCategoryIcon';
 
 interface ComunidadFeedProps {
   selectedCategory: string;
@@ -83,7 +85,7 @@ interface ComunidadFeedProps {
   onOpenAssistant: () => void;
 }
 
-const FILTER_OPTIONS = ['Todos', 'Siguiendo', ...COMUNIDAD_CATEGORIES] as const;
+const FILTER_OPTIONS = ['Todo', ...THEMATIC_CATEGORIES, 'Siguiendo'] as const;
 
 export function ComunidadFeed({
   selectedCategory,
@@ -225,8 +227,10 @@ export function ComunidadFeed({
 
     if (selectedCategory === 'Siguiendo') {
       base = base.filter((post) => followingIds.has(post.author_id));
-    } else if (selectedCategory !== 'Todos') {
-      base = base.filter((post) => post.category === selectedCategory);
+    } else {
+      base = base.filter((post) =>
+        matchesThematicCategory(post.category, selectedCategory)
+      );
     }
 
     if (selectedHashtag) {
@@ -606,12 +610,16 @@ export function ComunidadFeed({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div
               role="tablist"
-              aria-label="Filtrar hilos por categoría"
+              aria-label="Filtrar hilos por sección temática"
               className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0"
             >
               {FILTER_OPTIONS.map((category) => {
-                const isActive = selectedCategory === category;
+                const isAll = category === 'Todo';
                 const isFollowingTab = category === 'Siguiendo';
+                const isActive =
+                  selectedCategory === category ||
+                  (isAll && selectedCategory === 'Todos');
+                const theme = getCategoryVisualTheme(category, 'comunidad');
                 return (
                   <button
                     key={category}
@@ -619,14 +627,20 @@ export function ComunidadFeed({
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => onSelectCategory(category)}
-                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                      isActive
-                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
-                        : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isAll || isFollowingTab
+                        ? isActive
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-fg)] shadow-sm'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                        : isActive
+                          ? theme.filterActiveClass
+                          : theme.filterIdleClass
                     }`}
                   >
-                    {isFollowingTab && (
+                    {isFollowingTab ? (
                       <UserCheck size={14} aria-hidden="true" />
+                    ) : (
+                      <ThematicCategoryIcon category={category} size={14} />
                     )}
                     <span>{category}</span>
                   </button>
@@ -808,7 +822,7 @@ export function ComunidadFeed({
                   ? !isAuthenticated
                     ? 'Inicia sesión para ver tu feed de Siguiendo'
                     : 'Aún no hay hilos de personas que sigues'
-                  : selectedCategory === 'Todos'
+                  : selectedCategory === 'Todo' || selectedCategory === 'Todos'
                     ? 'Todavía no hay hilos en la comunidad'
                     : `No hay hilos en ${selectedCategory}`}
           </h2>
@@ -819,18 +833,18 @@ export function ComunidadFeed({
                 ? 'Prueba con otra etiqueta o limpia el filtro para ver toda la conversación.'
                 : selectedCategory === 'Siguiendo'
                   ? 'Sigue a autores y lectores desde sus publicaciones o perfiles para ver sus hilos aquí.'
-                  : selectedCategory === 'Todos'
+                  : selectedCategory === 'Todo' || selectedCategory === 'Todos'
                     ? 'Lanza una pregunta, recomendación o debate con hashtags como #Anime o #Gaming.'
-                    : 'Explora otra categoría o inicia el primer hilo aquí.'}
+                    : 'Explora otra sección temática o inicia el primer hilo aquí.'}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {(selectedCategory !== 'Todos' ||
+            {((selectedCategory !== 'Todo' && selectedCategory !== 'Todos') ||
               selectedHashtag ||
               selectedCommunityId) && (
               <button
                 type="button"
                 onClick={() => {
-                  onSelectCategory('Todos');
+                  onSelectCategory('Todo');
                   onSelectHashtag(null);
                   onSelectCommunityId(null);
                 }}

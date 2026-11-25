@@ -24,12 +24,13 @@ import { useSocial } from '../context/SocialContext';
 import { ENABLE_AI_FEATURES } from '../lib/ai';
 import { fetchUserReportedPostIds } from '../lib/phase2';
 import {
-  ACTUALIDAD_CATEGORIES,
+  THEMATIC_CATEGORIES,
   deletePost,
   estimateReadMinutes,
   fetchPostsByMode,
   formatEditorialDate,
   getAuthorDisplayName,
+  matchesThematicCategory,
   sortPostsWithPinnedFirst,
   togglePostLike,
   togglePostPin,
@@ -45,6 +46,7 @@ import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 import { ReportPostModal } from './ReportPostModal';
+import { ThematicCategoryIcon } from './ThematicCategoryIcon';
 import { VerifiedBadge } from './VerifiedBadge';
 
 interface ActualidadFeedProps {
@@ -60,7 +62,7 @@ interface ActualidadFeedProps {
   onOpenAssistant: () => void;
 }
 
-const FILTER_OPTIONS = ['Todas', ...ACTUALIDAD_CATEGORIES] as const;
+const FILTER_OPTIONS = ['Todo', ...THEMATIC_CATEGORIES] as const;
 
 export function ActualidadFeed({
   selectedCategory,
@@ -142,10 +144,9 @@ export function ActualidadFeed({
   }, [deletedPostId]);
 
   const filteredPosts = useMemo(() => {
-    const base =
-      selectedCategory === 'Todas'
-        ? posts
-        : posts.filter((post) => post.category === selectedCategory);
+    const base = posts.filter((post) =>
+      matchesThematicCategory(post.category, selectedCategory)
+    );
     return sortPostsByMode(base, sortMode);
   }, [posts, selectedCategory, sortMode]);
 
@@ -337,11 +338,15 @@ export function ActualidadFeed({
           <div className="flex flex-col gap-3 md:items-end">
             <div
               role="tablist"
-              aria-label="Filtrar artículos por categoría"
+              aria-label="Filtrar artículos por sección temática"
               className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:px-0"
             >
               {FILTER_OPTIONS.map((category) => {
-                const isActive = selectedCategory === category;
+                const isAll = category === 'Todo';
+                const isActive =
+                  selectedCategory === category ||
+                  (isAll && selectedCategory === 'Todas');
+                const theme = getCategoryVisualTheme(category, 'actualidad');
                 return (
                   <button
                     key={category}
@@ -349,13 +354,18 @@ export function ActualidadFeed({
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => onSelectCategory(category)}
-                    className={`min-h-[40px] rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                      isActive
-                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
-                        : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isAll
+                        ? isActive
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-fg)] shadow-sm'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                        : isActive
+                          ? theme.filterActiveClass
+                          : theme.filterIdleClass
                     }`}
                   >
-                    {category}
+                    <ThematicCategoryIcon category={category} size={14} />
+                    <span>{category}</span>
                   </button>
                 );
               })}
@@ -469,23 +479,23 @@ export function ActualidadFeed({
             <Newspaper size={22} aria-hidden="true" />
           </div>
           <h2 className="mt-4 font-display text-xl font-semibold text-[var(--text-main)]">
-            {selectedCategory === 'Todas'
+            {selectedCategory === 'Todo' || selectedCategory === 'Todas'
               ? 'Todavía no hay artículos publicados'
               : `No hay artículos en ${selectedCategory}`}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-            {selectedCategory === 'Todas'
+            {selectedCategory === 'Todo' || selectedCategory === 'Todas'
               ? 'Publica la primera crónica o análisis editorial para inaugurar la portada.'
-              : 'Prueba otra categoría o publica el primer artículo sobre este tema.'}
+              : 'Prueba otra sección temática o publica el primer artículo sobre este tema.'}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {selectedCategory !== 'Todas' && (
+            {selectedCategory !== 'Todo' && selectedCategory !== 'Todas' && (
               <button
                 type="button"
-                onClick={() => onSelectCategory('Todas')}
+                onClick={() => onSelectCategory('Todo')}
                 className="min-h-[44px] rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
-                Ver todas las categorías
+                Ver todas las secciones
               </button>
             )}
             {isAuthenticated ? (

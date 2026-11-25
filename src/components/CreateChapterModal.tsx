@@ -12,7 +12,9 @@ import {
   ArrowDown,
   ArrowUp,
   ImagePlus,
+  Link2,
   Loader2,
+  Plus,
   Trash2,
   Upload,
   X,
@@ -22,13 +24,16 @@ import {
   MAX_CHAPTER_IMAGE_SIZE_BYTES,
   createChapter,
   generateUniqueFileId,
-  isManhwaType,
+  getSeriesTypeLabel,
+  isMangaType,
+  isVisualSeriesType,
   resolveSafeImageMeta,
   uploadChapterPages,
   type ChapterRecord,
   type SeriesRecord,
 } from '../lib/library';
 import { estimateReadMinutes } from '../lib/posts';
+import { isSafeHttpUrl } from '../lib/supabase';
 
 interface CreateChapterModalProps {
   isOpen: boolean;
@@ -38,13 +43,33 @@ interface CreateChapterModalProps {
   onCreated: (chapter: ChapterRecord) => void;
 }
 
-interface PendingPageItem {
-  id: string;
-  file: File;
-  previewUrl: string;
-}
+type PendingPageItem =
+  | {
+      id: string;
+      kind: 'file';
+      file: File;
+      previewUrl: string;
+      label: string;
+    }
+  | {
+      id: string;
+      kind: 'url';
+      url: string;
+      previewUrl: string;
+      label: string;
+    };
 
 const MAX_CHAPTER_TITLE_LENGTH = 140;
+
+function extractShortUrlLabel(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const segment = parsed.pathname.split('/').filter(Boolean).pop();
+    return segment ? decodeURIComponent(segment) : parsed.hostname;
+  } catch {
+    return url;
+  }
+}
 
 export function CreateChapterModal({
   isOpen,
@@ -62,6 +87,8 @@ export function CreateChapterModal({
   const [title, setTitle] = useState('');
   const [textContent, setTextContent] = useState('');
   const [pages, setPages] = useState<PendingPageItem[]>([]);
+  const [urlDraft, setUrlDraft] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
     total: number;
@@ -79,7 +106,9 @@ export function CreateChapterModal({
   useEffect(() => {
     return () => {
       for (const page of pagesRef.current) {
-        URL.revokeObjectURL(page.previewUrl);
+        if (page.kind === 'file') {
+          URL.revokeObjectURL(page.previewUrl);
+        }
       }
     };
   }, []);
@@ -115,8 +144,9 @@ export function CreateChapterModal({
 
   if (!isOpen) return null;
 
-  // Detecta tanto "manhwa" como "Manhwa" (sin importar mayúsculas/minúsculas)
-  const isManhwa = isManhwaType(series.type);
+  const isVisualSeries = isVisualSeriesType(series.type);
+  const isManga = isMangaType(series.type);
+  const seriesTypeLabel = getSeriesTypeLabel(series.type);
 
   function handleSelectPages(event: ChangeEvent<HTMLInputElement>) {
     const fileList = event.target.files;
@@ -130,9 +160,7 @@ export function CreateChapterModal({
       const file = fileList[i];
       const meta = resolveSafeImageMeta(file);
       if (!meta) {
-        rejectedMessages.push(
-          `"${file.name}" no es una imagen compatible.`
-        );
+        rejectedMessages.push(`"${file.name}" no es una imagen compatible.`);
         continue;
       }
       if (file.size > MAX_CHAPTER_IMAGE_SIZE_BYTES) {
@@ -143,12 +171,13 @@ export function CreateChapterModal({
       }
       nextItems.push({
         id: generateUniqueFileId(),
+        kind: 'file',
         file,
         previewUrl: URL.createObjectURL(file),
+        label: file.name,
       });
     }
 
-    // Limpia el input para permitir volver a elegir archivos en móviles
     event.target.value = '';
 
     if (rejectedMessages.length > 0) {
@@ -157,6 +186,48 @@ export function CreateChapterModal({
 
     if (nextItems.length > 0) {
       setPages((prev) => [...prev, ...nextItems]);
+    }
+  }
+
+  function handleAddPageUrls() {
+    const rawLines = urlDraft
+      .split(/[\n,\s]+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (rawLines.length === 0) {
+      setErrorMsg('Pega al menos una URL válida de imagen (https://…).');
+      return;
+    }
+
+    const nextItems: PendingPageItem[] = [];
+    const invalidCount: string[] = [];
+
+    for (const candidate of rawLines) {
+      if (!isSafeHttpUrl(candidate)) {
+        invalidCount.push(candidate);
+        continue;
+      }
+      nextItems.push({
+        id: generateUniqueFileId(),
+        kind: 'url',
+        url: candidate,
+        previewUrl: candidate,
+        label: extractShortUrlLabel(candidate),
+      });
+    }
+
+    if (invalidCount.length > 0) {
+      setErrorMsg(
+        `Se ignoraron ${invalidCount.length} enlaces inválidos. Usa URLs completas con https://`
+      );
+    } else {
+      setErrorMsg(null);
+    }
+
+    if (nextItems.length > 0) {
+      setPages((prev) => [...prev, ...nextItems]);
+      setUrlDraft('');
     }
   }
 
@@ -174,7 +245,7 @@ export function CreateChapterModal({
   function removePage(id: string) {
     setPages((prev) => {
       const target = prev.find((item) => item.id === id);
-      if (target) {
+      if (target && target.kind === 'file') {
         URL.revokeObjectURL(target.previewUrl);
       }
       return prev.filter((item) => item.id !== id);
@@ -183,7 +254,9 @@ export function CreateChapterModal({
 
   function clearAllPages() {
     for (const page of pages) {
-      URL.revokeObjectURL(page.previewUrl);
+      if (page.kind === 'file') {
+        URL.revokeObjectURL(page.previewUrl);
+      }
     }
     setPages([]);
   }
@@ -202,10 +275,10 @@ export function CreateChapterModal({
       return;
     }
 
-    if (isManhwa) {
+    if (isVisualSeries) {
       if (pages.length === 0) {
         setErrorMsg(
-          'Selecciona al menos una imagen de la galería antes de publicar el capítulo.'
+          'Agrega al menos una página (desde galería o URL) antes de publicar el capítulo.'
         );
         return;
       }
@@ -218,27 +291,52 @@ export function CreateChapterModal({
     setUploadProgress(null);
 
     try {
-      let uploadedUrls: string[] | null = null;
-      if (isManhwa) {
-        uploadedUrls = await uploadChapterPages(
-          pages.map((item) => item.file),
-          user.id,
-          series.id,
-          parsedNumber,
-          (current, total) => setUploadProgress({ current, total })
-        );
+      let finalUrls: string[] | null = null;
+      if (isVisualSeries) {
+        const fileEntries = pages
+          .map((item, idx) => ({ item, idx }))
+          .filter(
+            (
+              entry
+            ): entry is {
+              item: Extract<PendingPageItem, { kind: 'file' }>;
+              idx: number;
+            } => entry.item.kind === 'file'
+          );
+
+        const uploadedByIndex = new Map<number, string>();
+        if (fileEntries.length > 0) {
+          const uploadedUrls = await uploadChapterPages(
+            fileEntries.map((entry) => entry.item.file),
+            user.id,
+            series.id,
+            parsedNumber,
+            (current, total) => setUploadProgress({ current, total })
+          );
+          fileEntries.forEach((entry, i) => {
+            uploadedByIndex.set(entry.idx, uploadedUrls[i]);
+          });
+        }
+
+        finalUrls = pages.map((page, idx) => {
+          if (page.kind === 'url') return page.url;
+          return uploadedByIndex.get(idx) ?? '';
+        });
+        finalUrls = finalUrls.filter((u) => u.length > 0);
       }
 
       const created = await createChapter({
         seriesId: series.id,
         chapterNumber: parsedNumber,
         title: title.trim() || null,
-        textContent: isManhwa ? null : textContent.trim(),
-        imageUrls: isManhwa ? uploadedUrls : null,
+        textContent: isVisualSeries ? null : textContent.trim(),
+        imageUrls: isVisualSeries ? finalUrls : null,
       });
 
       setTitle('');
       setTextContent('');
+      setUrlDraft('');
+      setShowUrlInput(false);
       clearAllPages();
       setUploadProgress(null);
       onClose();
@@ -282,8 +380,13 @@ export function CreateChapterModal({
                 Subir Capítulo
               </h2>
               <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
-                {series.title} ·{' '}
-                {isManhwa ? 'Manhwa (imágenes)' : 'Novela (texto)'}
+                {series.title} · {seriesTypeLabel} (
+                {isManga
+                  ? 'páginas en lector paginado'
+                  : isVisualSeries
+                    ? 'scroll vertical continuo'
+                    : 'texto'}
+                )
               </p>
             </div>
 
@@ -343,7 +446,7 @@ export function CreateChapterModal({
             </div>
           </div>
 
-          {!isManhwa ? (
+          {!isVisualSeries ? (
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <label
@@ -371,13 +474,13 @@ export function CreateChapterModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <span className="block text-sm font-medium text-[var(--text-main)]">
-                    Páginas del capítulo
+                    Páginas del capítulo ({seriesTypeLabel})
                   </span>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Elige las imágenes desde tu galería; puedes reordenarlas
+                    Sube varias imágenes en orden o pega sus URLs y reordénalas
                     antes de publicar.
                   </p>
                 </div>
@@ -390,7 +493,6 @@ export function CreateChapterModal({
                 )}
               </div>
 
-              {/* Label nativo conectado directamente al input file para abrir galería móvil sin bloqueos */}
               <input
                 id={fileInputId}
                 type="file"
@@ -401,23 +503,79 @@ export function CreateChapterModal({
                 className="sr-only"
               />
 
-              <label
-                htmlFor={fileInputId}
-                className={`min-h-[56px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-3.5 text-sm font-semibold text-[var(--accent-primary)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer select-none ${
-                  isSubmitting ? 'pointer-events-none opacity-50' : ''
-                }`}
-              >
-                <ImagePlus size={19} aria-hidden="true" />
-                <span>
-                  {pages.length === 0
-                    ? 'Seleccionar imágenes de la galería'
-                    : 'Añadir más páginas de la galería'}
-                </span>
-              </label>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <label
+                  htmlFor={fileInputId}
+                  className={`min-h-[52px] flex items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--accent-primary)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer select-none ${
+                    isSubmitting ? 'pointer-events-none opacity-50' : ''
+                  }`}
+                >
+                  <ImagePlus size={18} aria-hidden="true" />
+                  <span>
+                    {pages.length === 0
+                      ? 'Subir imágenes'
+                      : 'Añadir más imágenes'}
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setShowUrlInput((prev) => !prev)}
+                  className={`min-h-[52px] inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                    showUrlInput
+                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:bg-[var(--bg-elevated)]'
+                  }`}
+                >
+                  <Link2 size={17} aria-hidden="true" />
+                  <span>Pegar URLs de páginas</span>
+                </button>
+              </div>
+
+              {showUrlInput && (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3.5 space-y-2.5">
+                  <label
+                    htmlFor="chapter-urls-input"
+                    className="block text-xs font-semibold text-[var(--text-main)]"
+                  >
+                    URLs de imágenes (una por línea, en orden)
+                  </label>
+                  <textarea
+                    id="chapter-urls-input"
+                    rows={3}
+                    value={urlDraft}
+                    onChange={(e) => setUrlDraft(e.target.value)}
+                    placeholder={
+                      'https://ejemplo.com/pag-01.jpg\nhttps://ejemplo.com/pag-02.jpg'
+                    }
+                    className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25"
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUrlDraft('');
+                        setShowUrlInput(false);
+                      }}
+                      className="min-h-[36px] rounded-lg px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddPageUrls}
+                      className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] transition-colors"
+                    >
+                      <Plus size={14} aria-hidden="true" />
+                      <span>Agregar páginas</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {pages.length > 0 && (
                 <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3">
-                  {/* Cuadrícula de miniaturas con número de página y controles */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {pages.map((page, index) => (
                       <div
@@ -428,11 +586,17 @@ export function CreateChapterModal({
                           <img
                             src={page.previewUrl}
                             alt={`Miniatura página ${index + 1}`}
+                            referrerPolicy="no-referrer"
                             className="h-full w-full object-cover"
                           />
                           <span className="absolute left-2 top-2 rounded-lg bg-black/80 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-sm">
                             Pág. {index + 1}
                           </span>
+                          {page.kind === 'url' && (
+                            <span className="absolute left-2 bottom-2 rounded-md bg-cyan-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                              URL
+                            </span>
+                          )}
                           <button
                             type="button"
                             disabled={isSubmitting}
@@ -446,7 +610,7 @@ export function CreateChapterModal({
 
                         <div className="flex items-center justify-between gap-1 border-t border-[var(--border-subtle)] px-2 py-1.5">
                           <span className="truncate text-[11px] text-[var(--text-secondary)]">
-                            {page.file.name}
+                            {page.label}
                           </span>
                           <div className="flex shrink-0 items-center gap-0.5">
                             <button
@@ -460,7 +624,9 @@ export function CreateChapterModal({
                             </button>
                             <button
                               type="button"
-                              disabled={index === pages.length - 1 || isSubmitting}
+                              disabled={
+                                index === pages.length - 1 || isSubmitting
+                              }
                               onClick={() => movePage(index, 1)}
                               aria-label={`Mover página ${index + 1} después`}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-25 transition-colors"
@@ -476,7 +642,7 @@ export function CreateChapterModal({
                   <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5 text-xs text-[var(--text-secondary)]">
                     <span className="tabular-nums">
                       Total: {pages.length}{' '}
-                      {pages.length === 1 ? 'imagen lista' : 'imágenes listas'}
+                      {pages.length === 1 ? 'página lista' : 'páginas listas'}
                     </span>
                     <button
                       type="button"

@@ -450,7 +450,11 @@ export function PublicProfileView({
                     </div>
                     <div className="p-3">
                       <span className="text-[11px] font-semibold text-[var(--accent-primary)]">
-                        {series.type === 'manhwa' ? 'Manhwa' : 'Novela'}
+                        {series.type === 'manga'
+                          ? 'Manga'
+                          : series.type === 'manhwa'
+                            ? 'Manhwa'
+                            : 'Novela'}
                       </span>
                       <h2 className="mt-0.5 line-clamp-2 font-display text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--accent-primary)] transition-colors">
                         {series.title}

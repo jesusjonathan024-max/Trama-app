@@ -25,15 +25,17 @@ import {
 } from '../lib/phase3';
 import { fetchCommunities, type CommunityRecord } from '../lib/phase4';
 import {
-  ACTUALIDAD_CATEGORIES,
   ALLOWED_IMAGE_TYPES,
-  COMUNIDAD_CATEGORIES,
   MAX_IMAGE_SIZE_BYTES,
+  THEMATIC_CATEGORIES,
   createPost,
   uploadPostImage,
   type PostMode,
 } from '../lib/posts';
+import { getCategoryVisualTheme } from '../lib/categoryColors';
 import { isStrictHttpsUrl } from '../lib/supabase';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
+import { ThematicCategoryIcon } from './ThematicCategoryIcon';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -56,7 +58,7 @@ export function CreatePostModal({
   const { user } = useAuth();
   const { unlockByKeys } = useAchievements();
   const [mode, setMode] = useState<PostMode>(defaultMode);
-  const [category, setCategory] = useState<string>(ACTUALIDAD_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(THEMATIC_CATEGORIES[0]);
   const [communities, setCommunities] = useState<CommunityRecord[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string>(
     defaultCommunityId ?? ''
@@ -79,11 +81,7 @@ export function CreatePostModal({
   useEffect(() => {
     if (!isOpen) return;
     setMode(defaultMode);
-    setCategory(
-      defaultMode === 'actualidad'
-        ? ACTUALIDAD_CATEGORIES[0]
-        : COMUNIDAD_CATEGORIES[0]
-    );
+    setCategory(THEMATIC_CATEGORIES[0]);
     setSelectedCommunityId(defaultCommunityId ?? '');
     setErrorMsg(null);
     fetchCommunities(user?.id)
@@ -114,16 +112,10 @@ export function CreatePostModal({
 
   if (!isOpen) return null;
 
-  const categories =
-    mode === 'actualidad' ? ACTUALIDAD_CATEGORIES : COMUNIDAD_CATEGORIES;
+  const categories = THEMATIC_CATEGORIES;
 
   function handleSwitchMode(nextMode: PostMode) {
     setMode(nextMode);
-    setCategory(
-      nextMode === 'actualidad'
-        ? ACTUALIDAD_CATEGORIES[0]
-        : COMUNIDAD_CATEGORIES[0]
-    );
     setErrorMsg(null);
   }
 
@@ -374,22 +366,23 @@ export function CreatePostModal({
             </div>
           </div>
 
-          {/* Categoría */}
+          {/* Sección temática */}
           <div>
             <label
               htmlFor="post-category"
               className="mb-2 block text-sm font-medium text-[var(--text-main)]"
             >
-              Categoría
+              Sección temática
             </label>
             <div
               id="post-category"
               role="radiogroup"
-              aria-label="Seleccionar categoría"
+              aria-label="Seleccionar sección temática"
               className="flex flex-wrap gap-2"
             >
               {categories.map((item) => {
                 const isSelected = category === item;
+                const theme = getCategoryVisualTheme(item, mode);
                 return (
                   <button
                     key={item}
@@ -397,13 +390,12 @@ export function CreatePostModal({
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => setCategory(item)}
-                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                      isSelected
-                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isSelected ? theme.filterActiveClass : theme.filterIdleClass
                     }`}
                   >
-                    {item}
+                    <ThematicCategoryIcon category={item} size={14} />
+                    <span>{item}</span>
                   </button>
                 );
               })}
@@ -711,15 +703,28 @@ export function CreatePostModal({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSubmitting}
-                className="min-h-[52px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-              >
-                <ImagePlus size={18} aria-hidden="true" />
-                <span>Adjuntar imagen · JPG, PNG, WebP o GIF (máx. 5 MB)</span>
-              </button>
+              <div className="space-y-2.5">
+                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+                  <CategoryCoverArtwork
+                    category={category}
+                    title={title.trim() || `Portada ilustrada · ${category}`}
+                    fallbackMode={mode}
+                    variant="compact"
+                    className="h-28 w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  className="min-h-[48px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                >
+                  <ImagePlus size={17} aria-hidden="true" />
+                  <span>
+                    Subir imagen propia (opcional) · JPG, PNG, WebP o GIF
+                  </span>
+                </button>
+              </div>
             )}
           </div>
 

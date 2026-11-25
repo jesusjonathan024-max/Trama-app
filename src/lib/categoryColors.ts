@@ -20,6 +20,10 @@ export interface CategoryVisualTheme {
   labelClass: string;
   /** Clase de texto acentuado limpio (sin cápsula) */
   textClass: string;
+  /** Botón de filtro activo con color temático vibrante */
+  filterActiveClass: string;
+  /** Botón de filtro inactivo con tinte sutil y borde adaptable */
+  filterIdleClass: string;
 }
 
 const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
@@ -33,6 +37,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-fuchsia-600/14 text-fuchsia-700 border-fuchsia-500/35 dark:bg-fuchsia-500/20 dark:text-fuchsia-200 dark:border-fuchsia-400/40',
     textClass: 'text-fuchsia-700 dark:text-fuchsia-300',
+    filterActiveClass:
+      'border-fuchsia-500 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-sm',
+    filterIdleClass:
+      'border-fuchsia-500/25 bg-fuchsia-500/[0.06] text-fuchsia-700 hover:bg-fuchsia-500/14 dark:border-fuchsia-400/25 dark:bg-fuchsia-500/10 dark:text-fuchsia-200 dark:hover:bg-fuchsia-500/20',
   },
   novela: {
     id: 'novela',
@@ -44,6 +52,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-violet-600/14 text-violet-700 border-violet-500/35 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-400/40',
     textClass: 'text-violet-700 dark:text-violet-300',
+    filterActiveClass:
+      'border-violet-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm',
+    filterIdleClass:
+      'border-violet-500/25 bg-violet-500/[0.06] text-violet-700 hover:bg-violet-500/14 dark:border-violet-400/25 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20',
   },
   deportes: {
     id: 'deportes',
@@ -55,6 +67,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-orange-600/14 text-orange-700 border-orange-500/35 dark:bg-orange-500/20 dark:text-orange-200 dark:border-orange-400/40',
     textClass: 'text-orange-700 dark:text-orange-300',
+    filterActiveClass:
+      'border-orange-500 bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm',
+    filterIdleClass:
+      'border-orange-500/25 bg-orange-500/[0.06] text-orange-700 hover:bg-orange-500/14 dark:border-orange-400/25 dark:bg-orange-500/10 dark:text-orange-200 dark:hover:bg-orange-500/20',
   },
   cultura: {
     id: 'cultura',
@@ -66,6 +82,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-teal-600/14 text-teal-700 border-teal-500/35 dark:bg-teal-500/20 dark:text-teal-200 dark:border-teal-400/40',
     textClass: 'text-teal-700 dark:text-teal-300',
+    filterActiveClass:
+      'border-teal-500 bg-gradient-to-r from-teal-600 to-emerald-500 text-white shadow-sm',
+    filterIdleClass:
+      'border-teal-500/25 bg-teal-500/[0.06] text-teal-700 hover:bg-teal-500/14 dark:border-teal-400/25 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20',
   },
   actualidad: {
     id: 'actualidad',
@@ -77,6 +97,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-cyan-600/14 text-cyan-700 border-cyan-500/35 dark:bg-cyan-500/20 dark:text-cyan-200 dark:border-cyan-400/40',
     textClass: 'text-cyan-700 dark:text-cyan-300',
+    filterActiveClass:
+      'border-cyan-500 bg-gradient-to-r from-cyan-600 to-sky-600 text-white shadow-sm',
+    filterIdleClass:
+      'border-cyan-500/25 bg-cyan-500/[0.06] text-cyan-700 hover:bg-cyan-500/14 dark:border-cyan-400/25 dark:bg-cyan-500/10 dark:text-cyan-200 dark:hover:bg-cyan-500/20',
   },
   tecnologia: {
     id: 'tecnologia',
@@ -88,6 +112,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-sky-600/14 text-sky-700 border-sky-500/35 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-400/40',
     textClass: 'text-sky-700 dark:text-sky-300',
+    filterActiveClass:
+      'border-blue-500 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-sm',
+    filterIdleClass:
+      'border-sky-500/25 bg-sky-500/[0.06] text-sky-700 hover:bg-sky-500/14 dark:border-sky-400/25 dark:bg-sky-500/10 dark:text-sky-200 dark:hover:bg-sky-500/20',
   },
   economia: {
     id: 'economia',
@@ -99,6 +127,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-emerald-600/14 text-emerald-700 border-emerald-500/35 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40',
     textClass: 'text-emerald-700 dark:text-emerald-300',
+    filterActiveClass:
+      'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm',
+    filterIdleClass:
+      'border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-700 hover:bg-emerald-500/14 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20',
   },
   debate: {
     id: 'debate',
@@ -110,6 +142,10 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     labelClass:
       'bg-emerald-600/14 text-emerald-700 border-emerald-500/35 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40',
     textClass: 'text-emerald-700 dark:text-emerald-300',
+    filterActiveClass:
+      'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-sm',
+    filterIdleClass:
+      'border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-700 hover:bg-emerald-500/14 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20',
   },
   arcade: {
     id: 'arcade',
@@ -120,13 +156,17 @@ const THEMES: Record<CategoryMotif, CategoryVisualTheme> = {
     secondaryHex: '#FDBA74',
     labelClass:
       'bg-rose-600/14 text-rose-700 border-rose-500/35 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-400/40',
-    textClass: 'text-orange-700 dark:text-orange-300',
+    textClass: 'text-rose-700 dark:text-rose-300',
+    filterActiveClass:
+      'border-rose-500 bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-sm',
+    filterIdleClass:
+      'border-rose-500/25 bg-rose-500/[0.06] text-rose-700 hover:bg-rose-500/14 dark:border-rose-400/25 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20',
   },
 };
 
 export function getCategoryVisualTheme(
   category?: string | null,
-  fallbackMode?: 'actualidad' | 'comunidad' | 'novela' | 'manhwa' | 'arcade'
+  fallbackMode?: 'actualidad' | 'comunidad' | 'novela' | 'manhwa' | 'manga' | 'arcade'
 ): CategoryVisualTheme {
   const norm = (category ?? '')
     .normalize('NFD')
@@ -194,7 +234,7 @@ export function getCategoryVisualTheme(
     return THEMES.actualidad;
   }
 
-  if (fallbackMode === 'manhwa') return THEMES.manga;
+  if (fallbackMode === 'manhwa' || fallbackMode === 'manga') return THEMES.manga;
   if (fallbackMode === 'novela') return THEMES.novela;
   if (fallbackMode === 'comunidad') return THEMES.debate;
   if (fallbackMode === 'arcade') return THEMES.arcade;

@@ -7,19 +7,98 @@ import {
 
 export type PostMode = 'actualidad' | 'comunidad';
 
-export const ACTUALIDAD_CATEGORIES = [
-  'Economía',
-  'Mundo',
+export const THEMATIC_CATEGORIES = [
+  'Noticias',
+  'Deportes',
+  'Cultura',
+  'Anime & Manga',
+  'Gaming',
   'Tecnología',
-  'Sociedad',
 ] as const;
 
-export const COMUNIDAD_CATEGORIES = [
-  'Debate',
-  'Anime y Manga',
-  'Novelas',
-  'Off-Topic',
-] as const;
+export type ThematicCategory = (typeof THEMATIC_CATEGORIES)[number];
+
+export const ACTUALIDAD_CATEGORIES = THEMATIC_CATEGORIES;
+export const COMUNIDAD_CATEGORIES = THEMATIC_CATEGORIES;
+
+function normalizeCategoryKey(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+export function matchesThematicCategory(
+  postCategory: string | null | undefined,
+  selectedFilter: string
+): boolean {
+  const filterKey = normalizeCategoryKey(selectedFilter);
+  if (
+    !filterKey ||
+    filterKey === 'todo' ||
+    filterKey === 'todas' ||
+    filterKey === 'todos'
+  ) {
+    return true;
+  }
+
+  const postKey = normalizeCategoryKey(postCategory);
+  if (!postKey) return false;
+  if (postKey === filterKey) return true;
+
+  if (filterKey === 'noticias') {
+    return (
+      postKey.includes('notic') ||
+      postKey.includes('mundo') ||
+      postKey.includes('econom') ||
+      postKey.includes('actualidad')
+    );
+  }
+  if (filterKey === 'deportes') {
+    return (
+      postKey.includes('deport') ||
+      postKey.includes('futbol') ||
+      postKey.includes('basket') ||
+      postKey.includes('esport')
+    );
+  }
+  if (filterKey === 'cultura') {
+    return (
+      postKey.includes('cultur') ||
+      postKey.includes('sociedad') ||
+      postKey.includes('novela') ||
+      postKey.includes('debate') ||
+      postKey.includes('off-topic') ||
+      postKey.includes('arte') ||
+      postKey.includes('cine')
+    );
+  }
+  if (filterKey === 'anime & manga') {
+    return (
+      postKey.includes('anime') ||
+      postKey.includes('manga') ||
+      postKey.includes('manhwa') ||
+      postKey.includes('webtoon')
+    );
+  }
+  if (filterKey === 'gaming') {
+    return (
+      postKey.includes('gaming') ||
+      postKey.includes('arcade') ||
+      postKey.includes('juego')
+    );
+  }
+  if (filterKey === 'tecnologia') {
+    return (
+      postKey.includes('tecnolog') ||
+      postKey.includes('ciencia') ||
+      postKey.includes('software')
+    );
+  }
+
+  return false;
+}
 
 export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',

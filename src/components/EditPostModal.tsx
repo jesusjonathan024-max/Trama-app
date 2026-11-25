@@ -2,12 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { AlertCircle, Link2, Loader2, Save, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
-  ACTUALIDAD_CATEGORIES,
-  COMUNIDAD_CATEGORIES,
+  THEMATIC_CATEGORIES,
   updatePost,
   type PostRecord,
 } from '../lib/posts';
+import { getCategoryVisualTheme } from '../lib/categoryColors';
 import { isStrictHttpsUrl } from '../lib/supabase';
+import { ThematicCategoryIcon } from './ThematicCategoryIcon';
 
 interface EditPostModalProps {
   post: PostRecord | null;
@@ -53,7 +54,7 @@ export function EditPostModal({
   if (!post) return null;
 
   const isActualidad = post.mode === 'actualidad';
-  const categories = isActualidad ? ACTUALIDAD_CATEGORIES : COMUNIDAD_CATEGORIES;
+  const categories = THEMATIC_CATEGORIES;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -174,23 +175,26 @@ export function EditPostModal({
         >
           <div>
             <span className="mb-2 block text-sm font-medium text-[var(--text-main)]">
-              Categoría
+              Sección temática
             </span>
             <div className="flex flex-wrap gap-2">
               {categories.map((item) => {
                 const isSelected = category === item;
+                const theme = getCategoryVisualTheme(
+                  item,
+                  isActualidad ? 'actualidad' : 'comunidad'
+                );
                 return (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setCategory(item)}
-                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                      isSelected
-                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isSelected ? theme.filterActiveClass : theme.filterIdleClass
                     }`}
                   >
-                    {item}
+                    <ThematicCategoryIcon category={item} size={14} />
+                    <span>{item}</span>
                   </button>
                 );
               })}

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Heart,
   Loader2,
+  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -20,7 +21,9 @@ import {
   fetchSeriesById,
   formatChapterNumber,
   getReadingProgress,
-  isManhwaType,
+  getSeriesTypeBadgeClass,
+  getSeriesTypeLabel,
+  isVisualSeriesType,
   type ChapterRecord,
   type ReadingProgressEntry,
   type SeriesRecord,
@@ -38,6 +41,7 @@ import {
 import { Avatar } from './Avatar';
 import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 import { CreateChapterModal } from './CreateChapterModal';
+import { CreateSeriesModal } from './CreateSeriesModal';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
@@ -79,6 +83,7 @@ export function SeriesDetailView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [isChapterModalOpen, setIsChapterModalOpen] = useState(false);
+  const [isEditSeriesOpen, setIsEditSeriesOpen] = useState(false);
 
   const [confirmingDeleteSeries, setConfirmingDeleteSeries] = useState(false);
   const [isDeletingSeries, setIsDeletingSeries] = useState(false);
@@ -163,7 +168,9 @@ export function SeriesDetailView({
 
   const isCreator = Boolean(user && user.id === series.author_id);
   const canModerate = Boolean(isOwner || isCreator);
-  const isManhwa = isManhwaType(series.type);
+  const isVisualSeries = isVisualSeriesType(series.type);
+  const seriesTypeLabel = getSeriesTypeLabel(series.type);
+  const seriesTypeBadgeClass = getSeriesTypeBadgeClass(series.type);
   const authorName = getAuthorDisplayName(series.author);
   const collectionEntry = getSeriesCollection(series.id);
   const isFavorite = Boolean(collectionEntry?.is_favorite);
@@ -273,14 +280,24 @@ export function SeriesDetailView({
         </button>
 
         {canModerate && !confirmingDeleteSeries && (
-          <button
-            type="button"
-            onClick={() => setConfirmingDeleteSeries(true)}
-            className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-red-500/35 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            <span>Eliminar obra</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditSeriesOpen(true)}
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            >
+              <Pencil size={14} aria-hidden="true" />
+              <span>Editar obra</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDeleteSeries(true)}
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-red-500/35 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              <span>Eliminar obra</span>
+            </button>
+          </div>
         )}
 
         {canModerate && confirmingDeleteSeries && (
@@ -325,22 +342,18 @@ export function SeriesDetailView({
               />
             ) : (
               <CategoryCoverArtwork
-                category={series.genre || (isManhwa ? 'Manhwa' : 'Novela')}
+                category={series.genre || seriesTypeLabel}
                 title={series.title}
-                fallbackMode={isManhwa ? 'manhwa' : 'novela'}
+                fallbackMode={series.type}
                 variant="portrait"
                 className="h-full w-full"
               />
             )}
 
             <span
-              className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-sm ${
-                isManhwa
-                  ? 'bg-gradient-to-r from-violet-600/95 to-fuchsia-600/95'
-                  : 'bg-gradient-to-r from-indigo-600/95 to-violet-600/95'
-              }`}
+              className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-sm ${seriesTypeBadgeClass}`}
             >
-              {isManhwa ? 'Manhwa' : 'Novela'}
+              {seriesTypeLabel}
             </span>
           </div>
         </div>
@@ -625,7 +638,7 @@ export function SeriesDetailView({
                         >
                           {formatEditorialDate(chapter.created_at)}
                         </time>
-                        {isManhwa && chapter.image_urls.length > 0 && (
+                        {isVisualSeries && chapter.image_urls.length > 0 && (
                           <>
                             <span aria-hidden="true">·</span>
                             <span className="tabular-nums">
@@ -703,6 +716,16 @@ export function SeriesDetailView({
         onClose={() => setIsChapterModalOpen(false)}
         onCreated={(created) => {
           setChapters((prev) => [...prev, created]);
+          onSeriesChanged();
+        }}
+      />
+
+      <CreateSeriesModal
+        isOpen={isEditSeriesOpen}
+        initialSeries={series}
+        onClose={() => setIsEditSeriesOpen(false)}
+        onSaved={(updated) => {
+          setSeries(updated);
           onSeriesChanged();
         }}
       />

@@ -12,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
 import {
   fetchSeriesCatalog,
+  getSeriesTypeBadgeClass,
+  getSeriesTypeLabel,
   type SeriesRecord,
   type SeriesType,
 } from '../lib/library';
@@ -48,9 +50,10 @@ interface BibliotecaCatalogProps {
 }
 
 const FILTER_TABS: { id: BibliotecaFilter; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
+  { id: 'todas', label: 'Todos' },
+  { id: 'manga', label: 'Manga' },
+  { id: 'manhwa', label: 'Manhwa' },
   { id: 'novela', label: 'Novelas' },
-  { id: 'manhwa', label: 'Manhwas' },
   { id: 'siguiendo', label: 'Siguiendo' },
 ];
 
@@ -167,7 +170,7 @@ export function BibliotecaCatalog({
               Biblioteca
             </h1>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Catálogo de novelas web y manhwas por capítulos.
+              Catálogo de manga paginado, manhwa/webtoon y novelas por capítulos.
             </p>
           </div>
 
@@ -296,9 +299,11 @@ export function BibliotecaCatalog({
                   : 'Aún no hay obras de autores que sigues'
                 : selectedFilter === 'todas'
                   ? 'La Biblioteca aún está vacía'
-                  : selectedFilter === 'novela'
-                    ? 'Todavía no hay novelas registradas'
-                    : 'Todavía no hay manhwas registrados'}
+                  : selectedFilter === 'manga'
+                    ? 'Todavía no hay mangas registrados'
+                    : selectedFilter === 'novela'
+                      ? 'Todavía no hay novelas registradas'
+                      : 'Todavía no hay manhwas registrados'}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
             {searchQuery.trim()
@@ -343,7 +348,8 @@ export function BibliotecaCatalog({
       ) : (
         <div className="mt-7 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
           {filteredSeries.map((series) => {
-            const isManhwa = series.type === 'manhwa';
+            const typeLabel = getSeriesTypeLabel(series.type);
+            const typeBadgeClass = getSeriesTypeBadgeClass(series.type);
             const collection = getSeriesCollection(series.id);
             const isFav = Boolean(collection?.is_favorite);
             const readingStatus = collection?.status ?? '';
@@ -351,7 +357,7 @@ export function BibliotecaCatalog({
 
             const genreTheme = getCategoryVisualTheme(
               series.genre,
-              isManhwa ? 'manhwa' : 'novela'
+              series.type
             );
 
             return (
@@ -376,9 +382,9 @@ export function BibliotecaCatalog({
                       />
                     ) : (
                       <CategoryCoverArtwork
-                        category={series.genre || (isManhwa ? 'Manhwa' : 'Novela')}
+                        category={series.genre || typeLabel}
                         title={series.title}
-                        fallbackMode={isManhwa ? 'manhwa' : 'novela'}
+                        fallbackMode={series.type}
                         variant="portrait"
                         className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
                       />
@@ -392,13 +398,9 @@ export function BibliotecaCatalog({
                   />
 
                   <span
-                    className={`pointer-events-none absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm ${
-                      isManhwa
-                        ? 'bg-gradient-to-r from-violet-600/95 to-fuchsia-600/95'
-                        : 'bg-gradient-to-r from-indigo-600/95 to-violet-600/95'
-                    }`}
+                    className={`pointer-events-none absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm ${typeBadgeClass}`}
                   >
-                    {isManhwa ? 'Manhwa' : 'Novela'}
+                    {typeLabel}
                   </span>
 
                   {/* Botón rápido de Favorita */}

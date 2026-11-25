@@ -7,9 +7,13 @@ import {
 } from 'react';
 import {
   AlertCircle,
+  BookOpen,
   BookPlus,
+  Columns2,
   ImagePlus,
   Loader2,
+  Save,
+  ScrollText,
   Trash2,
   X,
 } from 'lucide-react';
@@ -18,39 +22,104 @@ import {
   SERIES_GENRES,
   SERIES_STATUSES,
   createSeries,
+  normalizeSeriesType,
+  updateSeries,
   uploadSeriesCover,
   type SeriesRecord,
   type SeriesStatus,
   type SeriesType,
 } from '../lib/library';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES } from '../lib/posts';
+import { CategoryCoverArtwork } from './CategoryCoverArtwork';
 
 interface CreateSeriesModalProps {
   isOpen: boolean;
+  initialSeries?: SeriesRecord | null;
   onClose: () => void;
-  onCreated: (created: SeriesRecord) => void;
+  onCreated?: (created: SeriesRecord) => void;
+  onSaved?: (updated: SeriesRecord) => void;
 }
 
 const MAX_TITLE_LENGTH = 120;
 const MAX_SYNOPSIS_LENGTH = 1800;
 
+const FORMAT_OPTIONS: {
+  id: SeriesType;
+  label: string;
+  hint: string;
+  activeClass: string;
+}[] = [
+  {
+    id: 'manga',
+    label: 'Manga',
+    hint: 'Lectura paginada',
+    activeClass:
+      'border-rose-500/60 bg-gradient-to-br from-rose-500/18 to-pink-500/18 text-rose-700 dark:text-rose-200 shadow-xs',
+  },
+  {
+    id: 'manhwa',
+    label: 'Manhwa / Webtoon',
+    hint: 'Scroll vertical',
+    activeClass:
+      'border-fuchsia-500/60 bg-gradient-to-br from-violet-500/18 to-fuchsia-500/18 text-fuchsia-700 dark:text-fuchsia-200 shadow-xs',
+  },
+  {
+    id: 'novela',
+    label: 'Novela',
+    hint: 'Lectura de texto',
+    activeClass:
+      'border-indigo-500/60 bg-gradient-to-br from-indigo-500/18 to-blue-500/18 text-indigo-700 dark:text-indigo-200 shadow-xs',
+  },
+];
+
 export function CreateSeriesModal({
   isOpen,
+  initialSeries = null,
   onClose,
   onCreated,
+  onSaved,
 }: CreateSeriesModalProps) {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const isEditing = Boolean(initialSeries);
+
   const [title, setTitle] = useState('');
-  const [type, setType] = useState<SeriesType>('novela');
+  const [type, setType] = useState<SeriesType>('manga');
   const [genre, setGenre] = useState<string>(SERIES_GENRES[0]);
   const [status, setStatus] = useState<SeriesStatus>('En emisión');
   const [synopsis, setSynopsis] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setErrorMsg(null);
+    if (initialSeries) {
+      setTitle(initialSeries.title);
+      setType(normalizeSeriesType(initialSeries.type));
+      setGenre(initialSeries.genre || SERIES_GENRES[0]);
+      setStatus(
+        initialSeries.status === 'Finalizado' ? 'Finalizado' : 'En emisión'
+      );
+      setSynopsis(initialSeries.synopsis ?? '');
+      setExistingCoverUrl(initialSeries.cover_url ?? null);
+      setCoverFile(null);
+      setCoverPreview(null);
+    } else {
+      setTitle('');
+      setType('manga');
+      setGenre(SERIES_GENRES[0]);
+      setStatus('En emisión');
+      setSynopsis('');
+      setExistingCoverUrl(null);
+      setCoverFile(null);
+      setCoverPreview(null);
+    }
+  }, [isOpen, initialSeries]);
 
   useEffect(() => {
     return () => {
@@ -62,7 +131,6 @@ export function CreateSeriesModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setErrorMsg(null);
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape' && !isSubmitting) {
         onClose();
@@ -80,6 +148,7 @@ export function CreateSeriesModal({
     }
     setCoverFile(null);
     setCoverPreview(null);
+    setExistingCoverUrl(null);
   }
 
   function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
@@ -108,7 +177,7 @@ export function CreateSeriesModal({
 
   function resetForm() {
     setTitle('');
-    setType('novela');
+    setType('manga');
     setGenre(SERIES_GENRES[0]);
     setStatus('En emisión');
     setSynopsis('');
@@ -119,7 +188,7 @@ export function CreateSeriesModal({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) {
-      setErrorMsg('Debes iniciar sesión para registrar una obra.');
+      setErrorMsg('Debes iniciar sesión para guardar una obra.');
       return;
     }
 
@@ -140,34 +209,54 @@ export function CreateSeriesModal({
     setIsSubmitting(true);
 
     try {
-      let coverUrl: string | null = null;
+      let coverUrl: string | null = existingCoverUrl;
       if (coverFile) {
         coverUrl = await uploadSeriesCover(coverFile, user.id);
       }
 
-      const created = await createSeries({
-        authorId: user.id,
-        title: trimmedTitle,
-        type,
-        genre,
-        status,
-        synopsis: trimmedSynopsis,
-        coverUrl,
-      });
+      if (initialSeries) {
+        const updated = await updateSeries({
+          seriesId: initialSeries.id,
+          userId: user.id,
+          isOwner,
+          title: trimmedTitle,
+          type,
+          genre,
+          status,
+          synopsis: trimmedSynopsis,
+          coverUrl,
+        });
+        onClose();
+        onSaved?.(updated);
+      } else {
+        const created = await createSeries({
+          authorId: user.id,
+          title: trimmedTitle,
+          type,
+          genre,
+          status,
+          synopsis: trimmedSynopsis,
+          coverUrl,
+        });
 
-      resetForm();
-      onClose();
-      onCreated(created);
+        resetForm();
+        onClose();
+        onCreated?.(created);
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error
           ? err.message
-          : 'No se pudo registrar la obra. Inténtalo de nuevo.'
+          : isEditing
+            ? 'No se pudieron guardar los cambios de la obra.'
+            : 'No se pudo registrar la obra. Inténtalo de nuevo.'
       );
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  const displayedCoverSrc = coverPreview || existingCoverUrl;
 
   return (
     <div
@@ -194,10 +283,12 @@ export function CreateSeriesModal({
                 id="create-series-title"
                 className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
               >
-                Nueva Obra
+                {isEditing ? 'Editar Obra' : 'Nueva Obra'}
               </h2>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                Registra una novela o un manhwa en el catálogo de Biblioteca.
+                {isEditing
+                  ? 'Actualiza el formato, género, sinopsis o portada de tu serie.'
+                  : 'Registra un manga, manhwa/webtoon o novela en Biblioteca.'}
               </p>
             </div>
 
@@ -218,34 +309,45 @@ export function CreateSeriesModal({
           className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-5"
           noValidate
         >
-          {/* Tipo de obra */}
+          {/* Formato de obra: Manga / Manhwa / Novela */}
           <div>
-            <span className="mb-2 block text-xs font-medium text-[var(--text-secondary)]">
-              Formato
+            <span className="mb-2 block text-xs font-semibold text-[var(--text-secondary)]">
+              Formato de lectura
             </span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
-              <button
-                type="button"
-                onClick={() => setType('novela')}
-                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                  type === 'novela'
-                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)] shadow-xs'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                }`}
-              >
-                Novela
-              </button>
-              <button
-                type="button"
-                onClick={() => setType('manhwa')}
-                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                  type === 'manhwa'
-                    ? 'bg-amber-500/18 text-amber-800 dark:text-amber-200 shadow-xs'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                }`}
-              >
-                Manhwa
-              </button>
+            <div
+              role="radiogroup"
+              aria-label="Formato de la obra"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+            >
+              {FORMAT_OPTIONS.map((opt) => {
+                const isSelected = type === opt.id;
+                const Icon =
+                  opt.id === 'manga'
+                    ? Columns2
+                    : opt.id === 'manhwa'
+                      ? ScrollText
+                      : BookOpen;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setType(opt.id)}
+                    className={`min-h-[62px] flex flex-col items-start justify-center gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isSelected
+                        ? opt.activeClass
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold leading-tight">
+                      <Icon size={14} aria-hidden="true" />
+                      <span>{opt.label}</span>
+                    </span>
+                    <span className="text-[11px] opacity-80">{opt.hint}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -269,7 +371,7 @@ export function CreateSeriesModal({
               maxLength={MAX_TITLE_LENGTH}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Ej. Crónicas del Alba o Sombras de Seúl"
+              placeholder="Ej. Crónicas del Alba o Sombras de Kioto"
               className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
@@ -290,7 +392,11 @@ export function CreateSeriesModal({
                 className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               >
                 {SERIES_GENRES.map((item) => (
-                  <option key={item} value={item} className="bg-[var(--bg-card)] text-[var(--text-main)]">
+                  <option
+                    key={item}
+                    value={item}
+                    className="bg-[var(--bg-card)] text-[var(--text-main)]"
+                  >
                     {item}
                   </option>
                 ))}
@@ -359,19 +465,21 @@ export function CreateSeriesModal({
               aria-label="Seleccionar portada de la obra"
             />
 
-            {coverPreview ? (
+            {displayedCoverSrc ? (
               <div className="flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3">
                 <img
-                  src={coverPreview}
+                  src={displayedCoverSrc}
                   alt="Vista previa de la portada"
                   className="aspect-[3/4] w-24 shrink-0 rounded-lg object-cover border border-[var(--border-subtle)]"
                 />
                 <div className="min-w-0 flex-1 space-y-2 pt-1">
                   <p className="text-xs font-medium text-[var(--text-main)] truncate">
-                    {coverFile?.name}
+                    {coverFile?.name || 'Portada actual'}
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Lista para subirse al bucket media.
+                    {coverFile
+                      ? 'Lista para subirse al bucket media.'
+                      : 'Puedes conservar esta portada o subir una nueva.'}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
                     <button
@@ -395,15 +503,32 @@ export function CreateSeriesModal({
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSubmitting}
-                className="min-h-[54px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-              >
-                <ImagePlus size={18} aria-hidden="true" />
-                <span>Subir portada · JPG, PNG, WebP o GIF (máx. 5 MB)</span>
-              </button>
+              <div className="flex items-center gap-3.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3">
+                <CategoryCoverArtwork
+                  category={genre}
+                  title={title || genre}
+                  fallbackMode={type}
+                  variant="portrait"
+                  className="aspect-[3/4] w-20 shrink-0 rounded-lg border border-white/10"
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs font-medium text-[var(--text-main)]">
+                    Portada ilustrada automática
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                    Si no subes una imagen, se mostrará esta portada temática.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSubmitting}
+                    className="min-h-[38px] inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-main)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                  >
+                    <ImagePlus size={15} aria-hidden="true" />
+                    <span>Subir portada propia</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -438,7 +563,12 @@ export function CreateSeriesModal({
               {isSubmitting ? (
                 <>
                   <Loader2 size={17} className="animate-spin" aria-hidden="true" />
-                  <span>Registrando…</span>
+                  <span>{isEditing ? 'Guardando…' : 'Registrando…'}</span>
+                </>
+              ) : isEditing ? (
+                <>
+                  <Save size={17} aria-hidden="true" />
+                  <span>Guardar cambios</span>
                 </>
               ) : (
                 <>

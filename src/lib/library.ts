@@ -4,8 +4,9 @@ import {
   type PostAuthor,
 } from './posts';
 
-export type SeriesType = 'novela' | 'manhwa';
+export type SeriesType = 'manga' | 'manhwa' | 'novela';
 export type SeriesStatus = 'En emisión' | 'Finalizado';
+export type MangaReadingDirection = 'rtl' | 'ltr';
 
 export const SERIES_GENRES = [
   'Fantasía',
@@ -46,8 +47,46 @@ const SAFE_IMAGE_EXTENSIONS = new Set([
   'bmp',
 ]);
 
+export function normalizeSeriesType(
+  type: string | null | undefined
+): SeriesType {
+  const norm = (type ?? '').trim().toLowerCase();
+  if (norm === 'manga') return 'manga';
+  if (norm === 'manhwa' || norm === 'webtoon') return 'manhwa';
+  return 'novela';
+}
+
+export function isMangaType(type: string | null | undefined): boolean {
+  return normalizeSeriesType(type) === 'manga';
+}
+
 export function isManhwaType(type: string | null | undefined): boolean {
-  return (type ?? '').trim().toLowerCase() === 'manhwa';
+  return normalizeSeriesType(type) === 'manhwa';
+}
+
+export function isVisualSeriesType(type: string | null | undefined): boolean {
+  const normalized = normalizeSeriesType(type);
+  return normalized === 'manga' || normalized === 'manhwa';
+}
+
+export function getSeriesTypeLabel(type: string | null | undefined): string {
+  const normalized = normalizeSeriesType(type);
+  if (normalized === 'manga') return 'Manga';
+  if (normalized === 'manhwa') return 'Manhwa';
+  return 'Novela';
+}
+
+export function getSeriesTypeBadgeClass(
+  type: string | null | undefined
+): string {
+  const normalized = normalizeSeriesType(type);
+  if (normalized === 'manga') {
+    return 'bg-gradient-to-r from-rose-600/95 to-pink-600/95';
+  }
+  if (normalized === 'manhwa') {
+    return 'bg-gradient-to-r from-violet-600/95 to-fuchsia-600/95';
+  }
+  return 'bg-gradient-to-r from-indigo-600/95 to-blue-600/95';
 }
 
 export function generateUniqueFileId(): string {
@@ -194,7 +233,7 @@ function mapRawSeries(row: RawSeriesRow): SeriesRecord {
     id: row.id,
     author_id: row.author_id,
     title: row.title,
-    type: isManhwaType(row.type) ? 'manhwa' : 'novela',
+    type: normalizeSeriesType(row.type),
     genre: row.genre?.trim() || 'Fantasía',
     status: row.status?.trim() || 'En emisión',
     synopsis: row.synopsis ?? '',
@@ -357,6 +396,47 @@ export async function createSeries(params: {
   return mapRawSeries(data as unknown as RawSeriesRow);
 }
 
+export async function updateSeries(params: {
+  seriesId: string;
+  userId: string;
+  isOwner: boolean;
+  title: string;
+  type: SeriesType;
+  genre: string;
+  status: SeriesStatus;
+  synopsis: string;
+  coverUrl?: string | null;
+}): Promise<SeriesRecord> {
+  const payload: Record<string, unknown> = {
+    title: params.title,
+    type: params.type,
+    genre: params.genre,
+    status: params.status,
+    synopsis: params.synopsis,
+  };
+
+  if (params.coverUrl !== undefined) {
+    payload.cover_url = params.coverUrl;
+  }
+
+  let query = supabase
+    .from('series')
+    .update(payload)
+    .eq('id', params.seriesId);
+
+  if (!params.isOwner) {
+    query = query.eq('author_id', params.userId);
+  }
+
+  const { data, error } = await query.select(SERIES_SELECT).single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return mapRawSeries(data as unknown as RawSeriesRow);
+}
+
 export async function deleteSeries(
   seriesId: string,
   userId: string,
@@ -486,6 +566,24 @@ export function formatChapterNumber(num: number): string {
 
 const PROGRESS_STORAGE_KEY = 'trama_library_progress_v1';
 const NOVEL_PREFS_STORAGE_KEY = 'trama_novel_reader_prefs_v1';
+const MANGA_DIRECTION_STORAGE_KEY = 'trama_manga_direction_v1';
+
+export function getMangaReadingDirection(): MangaReadingDirection {
+  try {
+    const raw = window.localStorage.getItem(MANGA_DIRECTION_STORAGE_KEY);
+    return raw === 'ltr' ? 'ltr' : 'rtl';
+  } catch {
+    return 'rtl';
+  }
+}
+
+export function saveMangaReadingDirection(dir: MangaReadingDirection): void {
+  try {
+    window.localStorage.setItem(MANGA_DIRECTION_STORAGE_KEY, dir);
+  } catch {
+    // Ignora fallos de almacenamiento privado
+  }
+}
 
 export function getReadingProgress(
   seriesId: string

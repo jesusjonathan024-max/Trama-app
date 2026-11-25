@@ -7,7 +7,7 @@ import {
 interface CategoryCoverArtworkProps {
   category?: string | null;
   title?: string | null;
-  fallbackMode?: 'actualidad' | 'comunidad' | 'novela' | 'manhwa' | 'arcade';
+  fallbackMode?: 'actualidad' | 'comunidad' | 'novela' | 'manhwa' | 'manga' | 'arcade';
   variant?: 'hero' | 'card' | 'portrait' | 'compact';
   className?: string;
 }
@@ -388,13 +388,15 @@ export function CategoryCoverArtwork({
 
   const displayCategory = (
     category?.trim() ||
-    (fallbackMode === 'manhwa'
-      ? 'Manhwa'
-      : fallbackMode === 'novela'
-        ? 'Novela'
-        : fallbackMode === 'comunidad'
-          ? 'Comunidad'
-          : 'Actualidad')
+    (fallbackMode === 'manga'
+      ? 'Manga'
+      : fallbackMode === 'manhwa'
+        ? 'Manhwa'
+        : fallbackMode === 'novela'
+          ? 'Novela'
+          : fallbackMode === 'comunidad'
+            ? 'Comunidad'
+            : 'Actualidad')
   );
 
   const isPortrait = variant === 'portrait';

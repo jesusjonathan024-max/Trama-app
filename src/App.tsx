@@ -54,8 +54,8 @@ function AppShell() {
   const [isCreateSeriesModalOpen, setIsCreateSeriesModalOpen] = useState(false);
 
   // Estado de Actualidad y Comunidad
-  const [actualidadCategory, setActualidadCategory] = useState('Todas');
-  const [comunidadCategory, setComunidadCategory] = useState('Todos');
+  const [actualidadCategory, setActualidadCategory] = useState('Todo');
+  const [comunidadCategory, setComunidadCategory] = useState('Todo');
   const [comunidadHashtag, setComunidadHashtag] = useState<string | null>(null);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null
@@ -211,7 +211,7 @@ function AppShell() {
     setSelectedSeries(null);
     setSelectedProfileId(null);
     setActiveView('comunidad');
-    setComunidadCategory('Todos');
+    setComunidadCategory('Todo');
     setComunidadHashtag(tag);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
@@ -267,9 +267,9 @@ function AppShell() {
     setActiveReader(null);
     setActiveView(publishedMode);
     if (publishedMode === 'actualidad') {
-      setActualidadCategory('Todas');
+      setActualidadCategory('Todo');
     } else {
-      setComunidadCategory('Todos');
+      setComunidadCategory('Todo');
       setComunidadHashtag(null);
     }
     setFeedRefreshKey((prev) => prev + 1);
