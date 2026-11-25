@@ -2,23 +2,30 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   BookOpen,
-  ChevronRight,
+  Heart,
   Plus,
   Search,
+  UserCheck,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
 import {
   fetchSeriesCatalog,
   type SeriesRecord,
   type SeriesType,
 } from '../lib/library';
 import { getAuthorDisplayName } from '../lib/posts';
+import {
+  READING_STATUS_OPTIONS,
+  type ReadingStatus,
+} from '../lib/social';
 import { Avatar } from './Avatar';
+import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
-export type BibliotecaFilter = 'todas' | SeriesType;
+export type BibliotecaFilter = 'todas' | SeriesType | 'siguiendo';
 
 interface BibliotecaCatalogProps {
   selectedFilter: BibliotecaFilter;
@@ -28,6 +35,7 @@ interface BibliotecaCatalogProps {
   refreshKey: number;
   deletedSeriesId: string | null;
   onSelectSeries: (series: SeriesRecord) => void;
+  onOpenAuthorProfile: (authorId: string) => void;
   onOpenCreateSeries: () => void;
   onOpenAuth: () => void;
 }
@@ -36,6 +44,7 @@ const FILTER_TABS: { id: BibliotecaFilter; label: string }[] = [
   { id: 'todas', label: 'Todas' },
   { id: 'novela', label: 'Novelas' },
   { id: 'manhwa', label: 'Manhwas' },
+  { id: 'siguiendo', label: 'Siguiendo' },
 ];
 
 export function BibliotecaCatalog({
@@ -46,10 +55,18 @@ export function BibliotecaCatalog({
   refreshKey,
   deletedSeriesId,
   onSelectSeries,
+  onOpenAuthorProfile,
   onOpenCreateSeries,
   onOpenAuth,
 }: BibliotecaCatalogProps) {
   const { isAuthenticated } = useAuth();
+  const {
+    followingIds,
+    getSeriesCollection,
+    setSeriesStatus,
+    toggleSeriesFavorite,
+    busySeriesIds,
+  } = useSocial();
   const [seriesList, setSeriesList] = useState<SeriesRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -83,7 +100,9 @@ export function BibliotecaCatalog({
   const filteredSeries = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     return seriesList.filter((item) => {
-      if (selectedFilter !== 'todas' && item.type !== selectedFilter) {
+      if (selectedFilter === 'siguiendo') {
+        if (!followingIds.has(item.author_id)) return false;
+      } else if (selectedFilter !== 'todas' && item.type !== selectedFilter) {
         return false;
       }
       if (normalizedQuery) {
@@ -91,7 +110,24 @@ export function BibliotecaCatalog({
       }
       return true;
     });
-  }, [seriesList, selectedFilter, searchQuery]);
+  }, [seriesList, selectedFilter, searchQuery, followingIds]);
+
+  async function handleCardFavorite(seriesId: string) {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    await toggleSeriesFavorite(seriesId);
+  }
+
+  async function handleCardStatusChange(seriesId: string, raw: string) {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    const nextStatus = raw ? (raw as ReadingStatus) : null;
+    await setSeriesStatus(seriesId, nextStatus);
+  }
 
   return (
     <section
@@ -130,7 +166,7 @@ export function BibliotecaCatalog({
           <div
             role="tablist"
             aria-label="Filtrar obras por tipo"
-            className="flex items-center gap-1.5"
+            className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:px-0"
           >
             {FILTER_TABS.map((tab) => {
               const isActive = selectedFilter === tab.id;
@@ -141,13 +177,16 @@ export function BibliotecaCatalog({
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => onSelectFilter(tab.id)}
-                  className={`min-h-[42px] rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                  className={`min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                     isActive
                       ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
                       : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                   }`}
                 >
-                  {tab.label}
+                  {tab.id === 'siguiendo' && (
+                    <UserCheck size={14} aria-hidden="true" />
+                  )}
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
@@ -229,16 +268,22 @@ export function BibliotecaCatalog({
           <h2 className="mt-4 font-display text-xl font-semibold text-[var(--text-main)]">
             {searchQuery.trim()
               ? 'No encontramos obras con ese título'
-              : selectedFilter === 'todas'
-                ? 'La Biblioteca aún está vacía'
-                : selectedFilter === 'novela'
-                  ? 'Todavía no hay novelas registradas'
-                  : 'Todavía no hay manhwas registrados'}
+              : selectedFilter === 'siguiendo'
+                ? !isAuthenticated
+                  ? 'Inicia sesión para ver autores seguidos'
+                  : 'Aún no hay obras de autores que sigues'
+                : selectedFilter === 'todas'
+                  ? 'La Biblioteca aún está vacía'
+                  : selectedFilter === 'novela'
+                    ? 'Todavía no hay novelas registradas'
+                    : 'Todavía no hay manhwas registrados'}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
             {searchQuery.trim()
               ? 'Prueba con otra palabra o limpia el buscador para ver todo el catálogo.'
-              : 'Sé la primera persona en registrar una obra y subir sus primeros capítulos.'}
+              : selectedFilter === 'siguiendo'
+                ? 'Sigue a tus autores favoritos desde cualquier obra o perfil para encontrar sus títulos aquí.'
+                : 'Sé la primera persona en registrar una obra y subir sus primeros capítulos.'}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             {(searchQuery.trim() || selectedFilter !== 'todas') && (
@@ -277,37 +322,47 @@ export function BibliotecaCatalog({
         <div className="mt-7 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
           {filteredSeries.map((series) => {
             const isManhwa = series.type === 'manhwa';
+            const collection = getSeriesCollection(series.id);
+            const isFav = Boolean(collection?.is_favorite);
+            const readingStatus = collection?.status ?? '';
+            const isBusy = Boolean(busySeriesIds[series.id]);
+
             return (
-              <button
+              <article
                 key={series.id}
-                type="button"
-                onClick={() => onSelectSeries(series)}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left shadow-sm hover:border-[var(--accent-border)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left shadow-sm hover:border-[var(--accent-border)] transition-colors duration-300"
               >
                 {/* Portada vertical 3:4 */}
                 <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--bg-subtle)]">
-                  {series.cover_url ? (
-                    <MediaImage
-                      src={series.cover_url}
-                      alt={`Portada de ${series.title}`}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                      fallbackClassName="h-full w-full"
-                    />
-                  ) : (
-                    <div
-                      className={`flex h-full w-full flex-col justify-end p-4 ${
-                        isManhwa
-                          ? 'bg-gradient-to-br from-[#2B2012] via-[#171412] to-[#0E1118]'
-                          : 'bg-gradient-to-br from-[#13233C] via-[#111622] to-[#0C0F16]'
-                      }`}
-                    >
-                      <BookOpen
-                        size={28}
-                        className="mb-auto text-white/25"
-                        aria-hidden="true"
+                  <button
+                    type="button"
+                    onClick={() => onSelectSeries(series)}
+                    aria-label={`Abrir ${series.title}`}
+                    className="block h-full w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
+                  >
+                    {series.cover_url ? (
+                      <MediaImage
+                        src={series.cover_url}
+                        alt={`Portada de ${series.title}`}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        fallbackClassName="h-full w-full"
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <div
+                        className={`flex h-full w-full flex-col justify-end p-4 ${
+                          isManhwa
+                            ? 'bg-gradient-to-br from-[#2B2012] via-[#171412] to-[#0E1118]'
+                            : 'bg-gradient-to-br from-[#13233C] via-[#111622] to-[#0C0F16]'
+                        }`}
+                      >
+                        <BookOpen
+                          size={28}
+                          className="mb-auto text-white/25"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </button>
 
                   {/* Scrim inferior medido para alto contraste */}
                   <div
@@ -316,7 +371,7 @@ export function BibliotecaCatalog({
                   />
 
                   <span
-                    className={`absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-wide backdrop-blur-sm ${
+                    className={`pointer-events-none absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-wide backdrop-blur-sm ${
                       isManhwa
                         ? 'bg-[#B45309]/92 text-[#FEF3C7]'
                         : 'bg-[#1D4ED8]/92 text-[#DBEAFE]'
@@ -325,7 +380,32 @@ export function BibliotecaCatalog({
                     {isManhwa ? 'Manhwa' : 'Novela'}
                   </span>
 
-                  <div className="absolute inset-x-2.5 bottom-2 flex items-center justify-between gap-2 text-[11px] font-medium text-white/95">
+                  {/* Botón rápido de Favorita */}
+                  <button
+                    type="button"
+                    onClick={() => void handleCardFavorite(series.id)}
+                    disabled={isBusy}
+                    aria-pressed={isFav}
+                    aria-label={
+                      isFav
+                        ? `Quitar ${series.title} de favoritas`
+                        : `Marcar ${series.title} como favorita`
+                    }
+                    title={isFav ? 'En favoritos' : 'Marcar como favorita'}
+                    className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-xl backdrop-blur-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isFav
+                        ? 'bg-rose-500 text-white shadow-sm'
+                        : 'bg-black/55 text-white/90 hover:bg-black/75'
+                    }`}
+                  >
+                    <Heart
+                      size={14}
+                      className={isFav ? 'fill-current' : ''}
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  <div className="pointer-events-none absolute inset-x-2.5 bottom-2 flex items-center justify-between gap-2 text-[11px] font-medium text-white/95">
                     <span className="truncate">{series.status}</span>
                     {series.chapters_count > 0 && (
                       <span className="shrink-0 tabular-nums text-white/80">
@@ -336,33 +416,73 @@ export function BibliotecaCatalog({
                   </div>
                 </div>
 
-                {/* ZONA 1 + 2: Cabecera de autor/género y Cuerpo de título/extracto */}
-                <div className="flex flex-1 flex-col justify-between p-3.5">
+                {/* ZONA 1 + 2: Cabecera de género, título y selector rápido de estado */}
+                <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
                   <div>
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--accent-primary)]">
+                    <div className="flex items-center justify-between gap-1.5 text-[11px] font-semibold text-[var(--accent-primary)]">
                       <span className="truncate">{series.genre}</span>
                     </div>
 
-                    <h2 className="mt-1 line-clamp-2 font-display text-[15px] font-bold leading-snug text-[var(--text-main)] group-hover:text-[var(--accent-primary)] transition-colors duration-300 sm:text-base">
-                      {series.title}
-                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => onSelectSeries(series)}
+                      className="mt-1 block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded"
+                    >
+                      <h2 className="line-clamp-2 font-display text-[15px] font-bold leading-snug text-[var(--text-main)] group-hover:text-[var(--accent-primary)] transition-colors duration-300 sm:text-base">
+                        {series.title}
+                      </h2>
+                    </button>
 
                     {series.synopsis && (
                       <p className="mt-1.5 hidden sm:line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
                         {series.synopsis}
                       </p>
                     )}
+
+                    {/* Selector de estado de lectura */}
+                    <div className="mt-2.5">
+                      <label
+                        htmlFor={`series-status-${series.id}`}
+                        className="sr-only"
+                      >
+                        Estado de lectura para {series.title}
+                      </label>
+                      <select
+                        id={`series-status-${series.id}`}
+                        value={readingStatus}
+                        disabled={isBusy}
+                        onChange={(e) =>
+                          void handleCardStatusChange(series.id, e.target.value)
+                        }
+                        className={`h-8 w-full rounded-lg border px-2 text-[11px] font-semibold transition-colors focus:border-[var(--accent-primary)] focus:outline-none ${
+                          readingStatus
+                            ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                            : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <option value="">+ Mi lista de lectura</option>
+                        {READING_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  {/* ZONA 3: Pie con autor, insignia y flecha */}
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5 transition-colors duration-300">
+                  {/* ZONA 3: Pie con autor clicable y botón Seguir */}
+                  <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-[var(--border-subtle)] pt-2.5 transition-colors duration-300">
                     {series.author ? (
-                      <div className="flex min-w-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onOpenAuthorProfile(series.author_id)}
+                        className="flex min-w-0 items-center gap-1.5 text-left hover:text-[var(--accent-primary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded"
+                      >
                         <Avatar
                           src={series.author.avatar_url}
                           name={series.author.username}
                           size="sm"
-                          className="!h-5 !w-5 !text-[9px]"
+                          className="!h-5 !w-5 !text-[9px] shrink-0"
                         />
                         <span className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
                           {getAuthorDisplayName(series.author)}
@@ -372,20 +492,21 @@ export function BibliotecaCatalog({
                           badge={series.author.badge}
                           size="xs"
                         />
-                      </div>
+                      </button>
                     ) : (
                       <span className="text-[11px] text-[var(--text-muted)]">
                         Biblioteca Trama
                       </span>
                     )}
-                    <ChevronRight
-                      size={14}
-                      className="shrink-0 text-[var(--text-muted)] group-hover:text-[var(--accent-primary)] transition-colors"
-                      aria-hidden="true"
+
+                    <FollowButton
+                      targetUserId={series.author_id}
+                      onOpenAuth={onOpenAuth}
+                      size="xs"
                     />
                   </div>
                 </div>
-              </button>
+              </article>
             );
           })}
         </div>

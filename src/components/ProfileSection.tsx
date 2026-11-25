@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -9,11 +10,14 @@ import {
 import {
   AlertCircle,
   Award,
+  Bookmark,
+  BookOpen,
   Camera,
   Check,
   CheckCircle2,
   Crown,
   FileText,
+  Heart,
   Loader2,
   LogOut,
   MessageSquare,
@@ -22,16 +26,27 @@ import {
   Save,
   Search,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
 import { useTheme } from '../context/ThemeContext';
+import { fetchSeriesCatalog, type SeriesRecord } from '../lib/library';
 import {
   fetchAllMembers,
   fetchOwnerStats,
+  formatRelativeDate,
+  getAuthorDisplayName,
   updateMemberBadge,
   type MemberDirectoryItem,
   type OwnerPlatformStats,
+  type PostRecord,
 } from '../lib/posts';
+import {
+  fetchPostsByIds,
+  READING_STATUS_OPTIONS,
+  type ReadingStatus,
+} from '../lib/social';
 import {
   MEDIA_BUCKET,
   MEMBER_BADGE_OPTIONS,
@@ -40,12 +55,22 @@ import {
 } from '../lib/supabase';
 import { AppearanceControls } from './AppearanceControls';
 import { Avatar } from './Avatar';
+import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
 interface ProfileSectionProps {
   onOpenAuth: () => void;
   onSignedOut: () => void;
+  onOpenPost: (post: PostRecord) => void;
+  onOpenSeries: (series: SeriesRecord) => void;
 }
+
+type CollectionTab =
+  | 'guardados'
+  | 'favoritos'
+  | 'pendiente'
+  | 'leyendo'
+  | 'terminado';
 
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -61,6 +86,8 @@ const MAX_BIO_LENGTH = 300;
 export function ProfileSection({
   onOpenAuth,
   onSignedOut,
+  onOpenPost,
+  onOpenSeries,
 }: ProfileSectionProps) {
   const {
     user,
@@ -74,6 +101,15 @@ export function ProfileSection({
     signOut,
   } = useAuth();
   const { isSyncingPrefs } = useTheme();
+  const {
+    myFollowCounts,
+    savedPostIds,
+    seriesCollections,
+    toggleSavePost,
+    setSeriesStatus,
+    toggleSeriesFavorite,
+    refreshSocial,
+  } = useSocial();
 
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
@@ -82,6 +118,12 @@ export function ProfileSection({
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const [collectionTab, setCollectionTab] =
+    useState<CollectionTab>('guardados');
+  const [savedPosts, setSavedPosts] = useState<PostRecord[]>([]);
+  const [catalogSeries, setCatalogSeries] = useState<SeriesRecord[]>([]);
+  const [isLoadingCollection, setIsLoadingCollection] = useState(false);
 
   const [ownerStats, setOwnerStats] = useState<OwnerPlatformStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -100,6 +142,75 @@ export function ProfileSection({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const savedIdsKey = useMemo(() => savedPostIds.join(','), [savedPostIds]);
+
+  const loadCollectionItems = useCallback(async () => {
+    if (!user?.id) {
+      setSavedPosts([]);
+      setCatalogSeries([]);
+      return;
+    }
+    setIsLoadingCollection(true);
+    try {
+      const [postsData, seriesData] = await Promise.all([
+        savedPostIds.length > 0
+          ? fetchPostsByIds(savedPostIds, user.id)
+          : Promise.resolve([]),
+        fetchSeriesCatalog().catch(() => []),
+      ]);
+      setSavedPosts(postsData);
+      setCatalogSeries(seriesData);
+    } finally {
+      setIsLoadingCollection(false);
+    }
+  }, [user?.id, savedIdsKey, savedPostIds]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    void loadCollectionItems();
+  }, [isAuthenticated, user?.id, loadCollectionItems]);
+
+  const seriesById = useMemo(
+    () => new Map(catalogSeries.map((s) => [s.id, s])),
+    [catalogSeries]
+  );
+
+  const favoriteSeriesList = useMemo(
+    () =>
+      Object.values(seriesCollections)
+        .filter((entry) => entry.is_favorite)
+        .map((entry) => seriesById.get(entry.series_id))
+        .filter((s): s is SeriesRecord => Boolean(s)),
+    [seriesCollections, seriesById]
+  );
+
+  const pendingSeriesList = useMemo(
+    () =>
+      Object.values(seriesCollections)
+        .filter((entry) => entry.status === 'pendiente')
+        .map((entry) => seriesById.get(entry.series_id))
+        .filter((s): s is SeriesRecord => Boolean(s)),
+    [seriesCollections, seriesById]
+  );
+
+  const readingSeriesList = useMemo(
+    () =>
+      Object.values(seriesCollections)
+        .filter((entry) => entry.status === 'leyendo')
+        .map((entry) => seriesById.get(entry.series_id))
+        .filter((s): s is SeriesRecord => Boolean(s)),
+    [seriesCollections, seriesById]
+  );
+
+  const completedSeriesList = useMemo(
+    () =>
+      Object.values(seriesCollections)
+        .filter((entry) => entry.status === 'terminado')
+        .map((entry) => seriesById.get(entry.series_id))
+        .filter((s): s is SeriesRecord => Boolean(s)),
+    [seriesCollections, seriesById]
+  );
 
   useEffect(() => {
     setUsername(profile?.username ?? '');
@@ -551,6 +662,318 @@ export function ProfileSection({
         <AppearanceControls />
       </div>
 
+      {/* Mi Colección y Lecturas (Guardados, Favoritos, Pendiente, Leyendo, Terminados) */}
+      <div
+        aria-labelledby="collections-heading"
+        className="mt-7 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+              <Bookmark size={18} aria-hidden="true" />
+            </div>
+            <div>
+              <h2
+                id="collections-heading"
+                className="font-display text-lg font-bold tracking-tight text-[var(--text-main)]"
+              >
+                Mi Colección y Lecturas
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                Publicaciones guardadas, obras favoritas y listas organizadas de Biblioteca.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              void refreshSocial();
+              void loadCollectionItems();
+            }}
+            disabled={isLoadingCollection}
+            aria-label="Actualizar colección"
+            className="min-h-[38px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw
+              size={13}
+              className={isLoadingCollection ? 'animate-spin' : ''}
+              aria-hidden="true"
+            />
+            <span>Actualizar</span>
+          </button>
+        </div>
+
+        {/* Pestañas de colección */}
+        <div
+          role="tablist"
+          aria-label="Listas de guardados y lectura"
+          className="no-scrollbar mt-4 flex items-center gap-1.5 overflow-x-auto border-b border-[var(--border-subtle)] pb-3"
+        >
+          {(
+            [
+              {
+                id: 'guardados',
+                label: 'Guardados',
+                count: savedPostIds.length,
+              },
+              {
+                id: 'favoritos',
+                label: 'Favoritos',
+                count: favoriteSeriesList.length,
+              },
+              {
+                id: 'pendiente',
+                label: 'Pendiente',
+                count: pendingSeriesList.length,
+              },
+              {
+                id: 'leyendo',
+                label: 'Leyendo',
+                count: readingSeriesList.length,
+              },
+              {
+                id: 'terminado',
+                label: 'Terminados',
+                count: completedSeriesList.length,
+              },
+            ] as const
+          ).map((tab) => {
+            const isActive = collectionTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setCollectionTab(tab.id)}
+                className={`min-h-[38px] inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-[10px] tabular-nums ${
+                    isActive
+                      ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]'
+                      : 'bg-[var(--bg-subtle)] text-[var(--text-muted)]'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Contenido de la pestaña activa */}
+        <div className="mt-4">
+          {isLoadingCollection &&
+          savedPosts.length === 0 &&
+          catalogSeries.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-[var(--text-muted)]">
+              <Loader2
+                size={15}
+                className="animate-spin text-[var(--accent-primary)]"
+                aria-hidden="true"
+              />
+              <span>Cargando tu colección…</span>
+            </div>
+          ) : collectionTab === 'guardados' ? (
+            savedPosts.length === 0 ? (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-8 text-center">
+                <Bookmark
+                  size={20}
+                  className="mx-auto text-[var(--text-muted)]"
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-medium text-[var(--text-main)]">
+                  Aún no tienes publicaciones guardadas
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Usa el botón Guardar en cualquier artículo de Actualidad o hilo de Comunidad.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {savedPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3.5 transition-colors hover:border-[var(--accent-border)]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onOpenPost(post)}
+                      className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="font-semibold text-[var(--accent-primary)]">
+                          {post.mode === 'actualidad'
+                            ? 'Actualidad'
+                            : 'Comunidad'}{' '}
+                          · {post.category}
+                        </span>
+                        <span aria-hidden="true" className="text-[var(--text-muted)]">
+                          ·
+                        </span>
+                        <span className="text-[var(--text-muted)] tabular-nums">
+                          {formatRelativeDate(post.created_at)}
+                        </span>
+                      </div>
+                      <h3 className="mt-1 line-clamp-2 font-display text-sm font-bold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors">
+                        {post.title || post.content.slice(0, 80)}
+                      </h3>
+                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                        Por {getAuthorDisplayName(post.author)}
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void toggleSavePost(post.id)}
+                      title="Quitar de guardados"
+                      aria-label="Quitar de guardados"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-red-500 transition-colors"
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (() => {
+            const list =
+              collectionTab === 'favoritos'
+                ? favoriteSeriesList
+                : collectionTab === 'pendiente'
+                  ? pendingSeriesList
+                  : collectionTab === 'leyendo'
+                    ? readingSeriesList
+                    : completedSeriesList;
+
+            if (list.length === 0) {
+              return (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-8 text-center">
+                  <BookOpen
+                    size={20}
+                    className="mx-auto text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
+                  <p className="mt-2 text-sm font-medium text-[var(--text-main)]">
+                    No hay obras en esta lista todavía
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Elige el estado de lectura o marca como favorita cualquier novela o manhwa en Biblioteca.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {list.map((series) => {
+                  const entry = seriesCollections[series.id];
+                  const isFav = Boolean(entry?.is_favorite);
+                  return (
+                    <div
+                      key={series.id}
+                      className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3 transition-colors hover:border-[var(--accent-border)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onOpenSeries(series)}
+                        className="h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)]"
+                      >
+                        {series.cover_url ? (
+                          <MediaImage
+                            src={series.cover_url}
+                            alt={`Portada de ${series.title}`}
+                            className="h-full w-full object-cover"
+                            fallbackClassName="h-full w-full"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <BookOpen
+                              size={16}
+                              className="text-[var(--text-muted)]"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => onOpenSeries(series)}
+                          className="block w-full text-left"
+                        >
+                          <p className="truncate font-display text-sm font-bold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors">
+                            {series.title}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            {series.type === 'manhwa' ? 'Manhwa' : 'Novela'} ·{' '}
+                            {series.chapters_count}{' '}
+                            {series.chapters_count === 1 ? 'cap.' : 'caps.'}
+                          </p>
+                        </button>
+
+                        <div className="mt-2 flex items-center gap-2">
+                          <select
+                            aria-label={`Cambiar estado de ${series.title}`}
+                            value={entry?.status ?? ''}
+                            onChange={(e) =>
+                              void setSeriesStatus(
+                                series.id,
+                                e.target.value
+                                  ? (e.target.value as ReadingStatus)
+                                  : null
+                              )
+                            }
+                            className="h-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 text-[11px] font-medium text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none"
+                          >
+                            <option value="">Sin estado</option>
+                            {READING_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={() => void toggleSeriesFavorite(series.id)}
+                            aria-pressed={isFav}
+                            title={
+                              isFav
+                                ? 'Quitar de favoritos'
+                                : 'Marcar como favorita'
+                            }
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
+                              isFav
+                                ? 'border-rose-500/40 bg-rose-500/12 text-rose-500'
+                                : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-rose-500'
+                            }`}
+                          >
+                            <Heart
+                              size={12}
+                              className={isFav ? 'fill-current' : ''}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
       {/* Panel privado de estadísticas del Dueño (visible exclusivamente para role === 'owner') */}
       {isOwner && (
         <div
@@ -860,6 +1283,26 @@ export function ProfileSection({
               <p className="mt-1 text-xs text-[var(--text-muted)] max-w-full truncate">
                 {user.email}
               </p>
+
+              {/* Contadores de Seguidores y Seguidos */}
+              <div className="mt-4 grid w-full grid-cols-2 gap-2.5 border-y border-[var(--border-subtle)] py-3">
+                <div className="rounded-xl bg-[var(--bg-subtle)] px-3 py-2 text-center">
+                  <p className="font-display text-lg font-bold tabular-nums text-[var(--text-main)]">
+                    {myFollowCounts.followers}
+                  </p>
+                  <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                    Seguidores
+                  </p>
+                </div>
+                <div className="rounded-xl bg-[var(--bg-subtle)] px-3 py-2 text-center">
+                  <p className="font-display text-lg font-bold tabular-nums text-[var(--text-main)]">
+                    {myFollowCounts.following}
+                  </p>
+                  <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                    Seguidos
+                  </p>
+                </div>
+              </div>
 
               <input
                 ref={fileInputRef}

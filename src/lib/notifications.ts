@@ -1,14 +1,14 @@
 import { supabase } from './supabase';
 import type { PostMode } from './posts';
 
-export type NotificationKind = 'comment' | 'like';
+export type NotificationKind = 'comment' | 'like' | 'follow';
 
 export interface NotificationItem {
   id: string;
   kind: NotificationKind;
-  postId: string;
-  postTitle: string;
-  postMode: PostMode;
+  postId: string | null;
+  postTitle: string | null;
+  postMode: PostMode | null;
   actorId: string;
   actorName: string;
   actorAvatar: string | null;
@@ -56,25 +56,39 @@ interface ActorProfileRow {
   badge: string | null;
 }
 
+interface RawFollowRow {
+  follower_id: string;
+  created_at: string;
+}
+
 export async function fetchUserNotifications(
   userId: string,
   limit = 20
 ): Promise<NotificationItem[]> {
-  const { data: myPosts, error: postsError } = await supabase
-    .from('posts')
-    .select('id, title, content, mode')
-    .eq('author_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const [myPostsRes, followsRes] = await Promise.all([
+    supabase
+      .from('posts')
+      .select('id, title, content, mode')
+      .eq('author_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('user_follows')
+      .select('follower_id, created_at')
+      .eq('following_id', userId)
+      .neq('follower_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ]);
 
-  if (postsError) {
-    throw new Error(postsError.message);
+  if (myPostsRes.error) {
+    throw new Error(myPostsRes.error.message);
   }
 
-  const ownedPosts = (myPosts ?? []) as OwnedPostSummary[];
-  if (ownedPosts.length === 0) {
-    return [];
-  }
+  const ownedPosts = (myPostsRes.data ?? []) as OwnedPostSummary[];
+  const rawFollows = followsRes.error
+    ? []
+    : ((followsRes.data ?? []) as RawFollowRow[]);
 
   const postMap = new Map<string, { title: string; mode: PostMode }>();
   const postIds: string[] = [];
@@ -91,25 +105,48 @@ export async function fetchUserNotifications(
     });
   }
 
-  const [commentsRes, likesRes] = await Promise.all([
-    supabase
-      .from('comments')
-      .select('id, post_id, author_id, content, created_at')
-      .in('post_id', postIds)
-      .neq('author_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    supabase
-      .from('post_likes')
-      .select('post_id, user_id, created_at')
-      .in('post_id', postIds)
-      .neq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-  ]);
+  let rawComments: Array<{
+    id: string;
+    post_id: string;
+    author_id: string;
+    content: string;
+    created_at: string;
+  }> = [];
+  let rawLikes: Array<{
+    post_id: string;
+    user_id: string;
+    created_at: string;
+  }> = [];
 
-  const rawComments = commentsRes.error ? [] : commentsRes.data ?? [];
-  const rawLikes = likesRes.error ? [] : likesRes.data ?? [];
+  if (postIds.length > 0) {
+    const [commentsRes, likesRes] = await Promise.all([
+      supabase
+        .from('comments')
+        .select('id, post_id, author_id, content, created_at')
+        .in('post_id', postIds)
+        .neq('author_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      supabase
+        .from('post_likes')
+        .select('post_id, user_id, created_at')
+        .in('post_id', postIds)
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    ]);
+
+    rawComments = commentsRes.error ? [] : (commentsRes.data ?? []);
+    rawLikes = likesRes.error ? [] : (likesRes.data ?? []);
+  }
+
+  if (
+    rawComments.length === 0 &&
+    rawLikes.length === 0 &&
+    rawFollows.length === 0
+  ) {
+    return [];
+  }
 
   const actorIds = new Set<string>();
   for (const row of rawComments) {
@@ -117,6 +154,9 @@ export async function fetchUserNotifications(
   }
   for (const row of rawLikes) {
     if (row.user_id) actorIds.add(String(row.user_id));
+  }
+  for (const row of rawFollows) {
+    if (row.follower_id) actorIds.add(String(row.follower_id));
   }
 
   const actorMap = new Map<string, ActorProfileRow>();
@@ -133,6 +173,27 @@ export async function fetchUserNotifications(
 
   const lastSeenAt = getNotificationsSeenAt(userId);
   const items: NotificationItem[] = [];
+
+  for (const row of rawFollows) {
+    const actor = actorMap.get(row.follower_id);
+    const createdAt = row.created_at || new Date().toISOString();
+    const ts = new Date(createdAt).getTime();
+    items.push({
+      id: `follow-${row.follower_id}`,
+      kind: 'follow',
+      postId: null,
+      postTitle: null,
+      postMode: null,
+      actorId: row.follower_id,
+      actorName: actor?.username?.trim() || 'Usuario de Trama',
+      actorAvatar: actor?.avatar_url ?? null,
+      actorRole: actor?.role ?? null,
+      actorBadge: actor?.badge ?? null,
+      excerpt: null,
+      createdAt,
+      isUnread: Number.isFinite(ts) ? ts > lastSeenAt : false,
+    });
+  }
 
   for (const row of rawComments) {
     const postInfo = postMap.get(row.post_id);

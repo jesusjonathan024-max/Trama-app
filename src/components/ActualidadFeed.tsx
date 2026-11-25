@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Bookmark,
   Clock,
+  Flame,
   Heart,
   MessageSquare,
   Newspaper,
@@ -14,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
 import {
   ACTUALIDAD_CATEGORIES,
   deletePost,
@@ -26,8 +29,10 @@ import {
   togglePostPin,
   type PostRecord,
 } from '../lib/posts';
+import { sortPostsByMode, type FeedSortMode } from '../lib/social';
 import { Avatar } from './Avatar';
 import { EditPostModal } from './EditPostModal';
+import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
@@ -38,6 +43,7 @@ interface ActualidadFeedProps {
   syncedPostUpdate: PostRecord | null;
   deletedPostId: string | null;
   onSelectPost: (post: PostRecord) => void;
+  onOpenAuthorProfile: (authorId: string) => void;
   onOpenAuth: () => void;
   onOpenCreate: () => void;
   onOpenAssistant: () => void;
@@ -52,12 +58,15 @@ export function ActualidadFeed({
   syncedPostUpdate,
   deletedPostId,
   onSelectPost,
+  onOpenAuthorProfile,
   onOpenAuth,
   onOpenCreate,
   onOpenAssistant,
 }: ActualidadFeedProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
+  const { isPostSaved, busySavePostIds, toggleSavePost } = useSocial();
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [sortMode, setSortMode] = useState<FeedSortMode>('recent');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -109,8 +118,16 @@ export function ActualidadFeed({
       selectedCategory === 'Todas'
         ? posts
         : posts.filter((post) => post.category === selectedCategory);
-    return sortPostsWithPinnedFirst(base);
-  }, [posts, selectedCategory]);
+    return sortPostsByMode(base, sortMode);
+  }, [posts, selectedCategory, sortMode]);
+
+  async function handleToggleSave(postId: string) {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    await toggleSavePost(postId);
+  }
 
   const leadArticle = filteredPosts[0] ?? null;
   const editorialList = filteredPosts.slice(1);
@@ -247,30 +264,65 @@ export function ActualidadFeed({
             </button>
           </div>
 
-          <div
-            role="tablist"
-            aria-label="Filtrar artículos por categoría"
-            className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:px-0"
-          >
-            {FILTER_OPTIONS.map((category) => {
-              const isActive = selectedCategory === category;
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => onSelectCategory(category)}
-                  className={`min-h-[40px] rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                    isActive
-                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
-                      : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
-                  }`}
-                >
-                  {category}
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-3 md:items-end">
+            <div
+              role="tablist"
+              aria-label="Filtrar artículos por categoría"
+              className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:px-0"
+            >
+              {FILTER_OPTIONS.map((category) => {
+                const isActive = selectedCategory === category;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => onSelectCategory(category)}
+                    className={`min-h-[40px] rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isActive
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
+                        : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              role="group"
+              aria-label="Ordenar artículos"
+              className="inline-flex self-start md:self-auto items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1 transition-colors duration-300"
+            >
+              <button
+                type="button"
+                onClick={() => setSortMode('recent')}
+                aria-pressed={sortMode === 'recent'}
+                className={`min-h-[34px] inline-flex items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                  sortMode === 'recent'
+                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Clock size={13} aria-hidden="true" />
+                <span>Más recientes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('popular')}
+                aria-pressed={sortMode === 'popular'}
+                className={`min-h-[34px] inline-flex items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                  sortMode === 'popular'
+                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Flame size={13} aria-hidden="true" />
+                <span>Más populares</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -422,21 +474,37 @@ export function ActualidadFeed({
             >
               {/* ZONA 1: CABECERA (Avatar, Autor, Insignia, Categoría y Fecha) */}
               <div>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2.5">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <Avatar
-                      src={leadArticle.author?.avatar_url}
-                      name={leadArticle.author?.username}
-                      size="sm"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => onOpenAuthorProfile(leadArticle.author_id)}
+                      aria-label={`Ver perfil de ${getAuthorDisplayName(leadArticle.author)}`}
+                      className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                    >
+                      <Avatar
+                        src={leadArticle.author?.avatar_url}
+                        name={leadArticle.author?.username}
+                        size="sm"
+                      />
+                    </button>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate text-xs font-semibold text-[var(--text-main)] max-w-[150px]">
+                        <button
+                          type="button"
+                          onClick={() => onOpenAuthorProfile(leadArticle.author_id)}
+                          className="truncate text-xs font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors max-w-[140px]"
+                        >
                           {getAuthorDisplayName(leadArticle.author)}
-                        </span>
+                        </button>
                         <OwnerBadge
                           role={leadArticle.author?.role}
                           badge={leadArticle.author?.badge}
+                          size="xs"
+                        />
+                        <FollowButton
+                          targetUserId={leadArticle.author_id}
+                          onOpenAuth={onOpenAuth}
                           size="xs"
                         />
                       </div>
@@ -521,6 +589,34 @@ export function ActualidadFeed({
                       <MessageSquare size={15} aria-hidden="true" />
                       <span className="tabular-nums">
                         {leadArticle.comments_count}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleSave(leadArticle.id)}
+                      disabled={Boolean(busySavePostIds[leadArticle.id])}
+                      aria-pressed={isPostSaved(leadArticle.id)}
+                      aria-label={
+                        isPostSaved(leadArticle.id)
+                          ? 'Quitar de guardados'
+                          : 'Guardar artículo'
+                      }
+                      className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                        isPostSaved(leadArticle.id)
+                          ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                      }`}
+                    >
+                      <Bookmark
+                        size={15}
+                        className={
+                          isPostSaved(leadArticle.id) ? 'fill-current' : ''
+                        }
+                        aria-hidden="true"
+                      />
+                      <span>
+                        {isPostSaved(leadArticle.id) ? 'Guardado' : 'Guardar'}
                       </span>
                     </button>
                   </div>
@@ -646,19 +742,35 @@ export function ActualidadFeed({
                         {/* ZONA 1: CABECERA */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2.5">
-                            <Avatar
-                              src={article.author?.avatar_url}
-                              name={article.author?.username}
-                              size="sm"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => onOpenAuthorProfile(article.author_id)}
+                              aria-label={`Ver perfil de ${getAuthorDisplayName(article.author)}`}
+                              className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                            >
+                              <Avatar
+                                src={article.author?.avatar_url}
+                                name={article.author?.username}
+                                size="sm"
+                              />
+                            </button>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="truncate text-xs font-semibold text-[var(--text-main)] max-w-[150px]">
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenAuthorProfile(article.author_id)}
+                                  className="truncate text-xs font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors max-w-[140px]"
+                                >
                                   {getAuthorDisplayName(article.author)}
-                                </span>
+                                </button>
                                 <OwnerBadge
                                   role={article.author?.role}
                                   badge={article.author?.badge}
+                                  size="xs"
+                                />
+                                <FollowButton
+                                  targetUserId={article.author_id}
+                                  onOpenAuth={onOpenAuth}
                                   size="xs"
                                 />
                               </div>
@@ -746,6 +858,34 @@ export function ActualidadFeed({
                             <MessageSquare size={15} aria-hidden="true" />
                             <span className="tabular-nums">
                               {article.comments_count}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleSave(article.id)}
+                            disabled={Boolean(busySavePostIds[article.id])}
+                            aria-pressed={isPostSaved(article.id)}
+                            aria-label={
+                              isPostSaved(article.id)
+                                ? 'Quitar de guardados'
+                                : 'Guardar artículo'
+                            }
+                            className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                              isPostSaved(article.id)
+                                ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                            }`}
+                          >
+                            <Bookmark
+                              size={15}
+                              className={
+                                isPostSaved(article.id) ? 'fill-current' : ''
+                              }
+                              aria-hidden="true"
+                            />
+                            <span className="hidden sm:inline">
+                              {isPostSaved(article.id) ? 'Guardado' : 'Guardar'}
                             </span>
                           </button>
                         </div>

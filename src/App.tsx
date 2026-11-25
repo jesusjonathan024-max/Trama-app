@@ -15,8 +15,10 @@ import { CreateSeriesModal } from './components/CreateSeriesModal';
 import { Navbar, type ActiveView } from './components/Navbar';
 import { PostDetailView } from './components/PostDetailView';
 import { ProfileSection } from './components/ProfileSection';
+import { PublicProfileView } from './components/PublicProfileView';
 import { SeriesDetailView } from './components/SeriesDetailView';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SocialProvider, useSocial } from './context/SocialContext';
 import { ThemeProvider } from './context/ThemeContext';
 import type { AiChatContext } from './lib/ai';
 import type { ChapterRecord, SeriesRecord } from './lib/library';
@@ -35,6 +37,7 @@ interface ActiveReaderState {
 
 function AppShell() {
   const { user, isAuthenticated } = useAuth();
+  const { socialError, clearSocialError } = useSocial();
 
   const [activeView, setActiveView] = useState<ActiveView>('actualidad');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -44,7 +47,11 @@ function AppShell() {
   // Estado de Actualidad y Comunidad
   const [actualidadCategory, setActualidadCategory] = useState('Todas');
   const [comunidadCategory, setComunidadCategory] = useState('Todos');
+  const [comunidadHashtag, setComunidadHashtag] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostRecord | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
+    null
+  );
   const [syncedPostUpdate, setSyncedPostUpdate] = useState<PostRecord | null>(
     null
   );
@@ -93,8 +100,40 @@ function AppShell() {
   const handleSelectView = useCallback((view: ActiveView) => {
     setSelectedPost(null);
     setSelectedSeries(null);
+    setSelectedProfileId(null);
     setActiveReader(null);
     setActiveView(view);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  const handleOpenAuthorProfile = useCallback(
+    (authorId: string) => {
+      if (!authorId) return;
+      if (user?.id && authorId === user.id) {
+        setSelectedPost(null);
+        setSelectedSeries(null);
+        setSelectedProfileId(null);
+        setActiveReader(null);
+        setActiveView('perfil');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        return;
+      }
+      setSelectedPost(null);
+      setSelectedSeries(null);
+      setActiveReader(null);
+      setSelectedProfileId(authorId);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    },
+    [user?.id]
+  );
+
+  const handleSelectHashtagFromDetail = useCallback((tag: string) => {
+    setSelectedPost(null);
+    setSelectedSeries(null);
+    setSelectedProfileId(null);
+    setActiveView('comunidad');
+    setComunidadCategory('Todos');
+    setComunidadHashtag(tag);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
@@ -112,6 +151,7 @@ function AppShell() {
         const post = await fetchPostById(postId, user?.id);
         if (!post) return;
         setSelectedSeries(null);
+        setSelectedProfileId(null);
         setActiveReader(null);
         setActiveView(post.mode);
         setSelectedPost(post);
@@ -124,6 +164,7 @@ function AppShell() {
   );
 
   const handleSelectPost = useCallback((post: PostRecord) => {
+    setSelectedProfileId(null);
     setSelectedPost(post);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
@@ -143,18 +184,21 @@ function AppShell() {
   const handlePostCreated = useCallback((publishedMode: PostMode) => {
     setSelectedPost(null);
     setSelectedSeries(null);
+    setSelectedProfileId(null);
     setActiveReader(null);
     setActiveView(publishedMode);
     if (publishedMode === 'actualidad') {
       setActualidadCategory('Todas');
     } else {
       setComunidadCategory('Todos');
+      setComunidadHashtag(null);
     }
     setFeedRefreshKey((prev) => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleSelectSeries = useCallback((series: SeriesRecord) => {
+    setSelectedProfileId(null);
     setSelectedSeries(series);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
@@ -215,6 +259,7 @@ function AppShell() {
     isAuthenticated &&
     !selectedPost &&
     !selectedSeries &&
+    !selectedProfileId &&
     !isCreatePostModalOpen &&
     !isCreateSeriesModalOpen &&
     (activeView === 'actualidad' || activeView === 'comunidad');
@@ -227,7 +272,26 @@ function AppShell() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenCreate={handleOpenGlobalCreate}
         onOpenNotificationPost={(postId) => void handleOpenNotificationPost(postId)}
+        onOpenNotificationProfile={handleOpenAuthorProfile}
       />
+
+      {socialError && (
+        <div
+          role="alert"
+          className="mx-auto mt-3 flex w-full max-w-4xl items-center justify-between gap-3 px-4 sm:px-6"
+        >
+          <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-red-500/40 bg-red-500/12 px-4 py-2.5 text-xs text-red-700 dark:text-red-100">
+            <span>{socialError}</span>
+            <button
+              type="button"
+              onClick={clearSocialError}
+              className="shrink-0 rounded-lg px-2 py-1 font-semibold hover:bg-red-500/15"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         {selectedPost ? (
@@ -235,6 +299,8 @@ function AppShell() {
             initialPost={selectedPost}
             onBack={() => setSelectedPost(null)}
             onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenAuthorProfile={handleOpenAuthorProfile}
+            onSelectHashtag={handleSelectHashtagFromDetail}
             onPostUpdated={handlePostUpdated}
             onPostDeleted={handlePostDeleted}
             onOpenAssistant={openPostAssistant}
@@ -243,14 +309,27 @@ function AppShell() {
           <SeriesDetailView
             initialSeries={selectedSeries}
             onBack={() => setSelectedSeries(null)}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenAuthorProfile={handleOpenAuthorProfile}
             onOpenChapter={handleOpenChapter}
             onSeriesDeleted={handleSeriesDeleted}
             onSeriesChanged={() => setLibraryRefreshKey((prev) => prev + 1)}
+          />
+        ) : selectedProfileId ? (
+          <PublicProfileView
+            profileUserId={selectedProfileId}
+            onBack={() => setSelectedProfileId(null)}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenOwnProfile={() => handleSelectView('perfil')}
+            onSelectPost={handleSelectPost}
+            onSelectSeries={handleSelectSeries}
           />
         ) : activeView === 'perfil' ? (
           <ProfileSection
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onSignedOut={() => handleSelectView('actualidad')}
+            onOpenPost={handleSelectPost}
+            onOpenSeries={handleSelectSeries}
           />
         ) : activeView === 'actualidad' ? (
           <ActualidadFeed
@@ -260,6 +339,7 @@ function AppShell() {
             syncedPostUpdate={syncedPostUpdate}
             deletedPostId={deletedPostId}
             onSelectPost={handleSelectPost}
+            onOpenAuthorProfile={handleOpenAuthorProfile}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onOpenCreate={() => setIsCreatePostModalOpen(true)}
             onOpenAssistant={() => openSectionAssistant('actualidad')}
@@ -268,10 +348,13 @@ function AppShell() {
           <ComunidadFeed
             selectedCategory={comunidadCategory}
             onSelectCategory={setComunidadCategory}
+            selectedHashtag={comunidadHashtag}
+            onSelectHashtag={setComunidadHashtag}
             refreshKey={feedRefreshKey}
             syncedPostUpdate={syncedPostUpdate}
             deletedPostId={deletedPostId}
             onSelectPost={handleSelectPost}
+            onOpenAuthorProfile={handleOpenAuthorProfile}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onOpenCreate={() => setIsCreatePostModalOpen(true)}
             onOpenAssistant={() => openSectionAssistant('comunidad')}
@@ -287,6 +370,7 @@ function AppShell() {
             refreshKey={libraryRefreshKey}
             deletedSeriesId={deletedSeriesId}
             onSelectSeries={handleSelectSeries}
+            onOpenAuthorProfile={handleOpenAuthorProfile}
             onOpenCreateSeries={() => setIsCreateSeriesModalOpen(true)}
             onOpenAuth={() => setIsAuthModalOpen(true)}
           />
@@ -340,7 +424,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <AppShell />
+        <SocialProvider>
+          <AppShell />
+        </SocialProvider>
       </ThemeProvider>
     </AuthProvider>
   );

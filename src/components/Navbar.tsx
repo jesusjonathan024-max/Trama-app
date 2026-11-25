@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Sun,
+  UserPlus,
   UserRound,
   Users,
   X,
@@ -82,6 +83,7 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onOpenCreate: () => void;
   onOpenNotificationPost: (postId: string) => void;
+  onOpenNotificationProfile: (userId: string) => void;
 }
 
 export function Navbar({
@@ -90,6 +92,7 @@ export function Navbar({
   onOpenAuth,
   onOpenCreate,
   onOpenNotificationPost,
+  onOpenNotificationProfile,
 }: NavbarProps) {
   const { isAuthenticated, isLoadingSession, user, profile } = useAuth();
   const { themeMode } = useTheme();
@@ -213,7 +216,11 @@ export function Navbar({
       );
     }
     setIsNotificationsOpen(false);
-    onOpenNotificationPost(item.postId);
+    if (item.kind === 'follow') {
+      onOpenNotificationProfile(item.actorId);
+    } else if (item.postId) {
+      onOpenNotificationPost(item.postId);
+    }
   }
 
   return (
@@ -393,7 +400,7 @@ export function Navbar({
                             Sin actividad todavía
                           </p>
                           <p className="mt-1 text-xs text-[var(--text-muted)]">
-                            Aquí aparecerán comentarios y Me gusta en tus publicaciones.
+                            Aquí aparecerán nuevos seguidores, comentarios y Me gusta en tus publicaciones.
                           </p>
                         </div>
                       ) : (
@@ -417,11 +424,15 @@ export function Navbar({
                                 className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-[var(--bg-card)] ${
                                   item.kind === 'like'
                                     ? 'bg-rose-500 text-white'
-                                    : 'bg-[var(--accent-primary)] text-[var(--accent-fg)]'
+                                    : item.kind === 'follow'
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-[var(--accent-primary)] text-[var(--accent-fg)]'
                                 }`}
                               >
                                 {item.kind === 'like' ? (
                                   <Heart size={9} className="fill-current" />
+                                ) : item.kind === 'follow' ? (
+                                  <UserPlus size={9} />
                                 ) : (
                                   <MessageSquare size={9} />
                                 )}
@@ -446,12 +457,23 @@ export function Navbar({
                               </div>
 
                               <p className="mt-0.5 text-xs text-[var(--text-secondary)] leading-snug">
-                                {item.kind === 'like'
-                                  ? 'Le gustó tu publicación '
-                                  : 'Comentó en '}
-                                <span className="font-medium text-[var(--text-main)]">
-                                  “{item.postTitle}”
-                                </span>
+                                {item.kind === 'follow' ? (
+                                  <>
+                                    Comenzó a seguirte ·{' '}
+                                    <span className="font-medium text-[var(--accent-primary)]">
+                                      Ver perfil
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    {item.kind === 'like'
+                                      ? 'Le gustó tu publicación '
+                                      : 'Comentó en '}
+                                    <span className="font-medium text-[var(--text-main)]">
+                                      “{item.postTitle}”
+                                    </span>
+                                  </>
+                                )}
                               </p>
 
                               {item.excerpt && (

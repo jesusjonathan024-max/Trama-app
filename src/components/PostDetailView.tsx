@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Bookmark,
   Clock,
   Globe,
   Heart,
@@ -14,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
 import {
   deletePost,
   estimateReadMinutes,
@@ -28,6 +30,8 @@ import {
 import { Avatar } from './Avatar';
 import { CommentSection } from './CommentSection';
 import { EditPostModal } from './EditPostModal';
+import { FollowButton } from './FollowButton';
+import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
@@ -35,6 +39,8 @@ interface PostDetailViewProps {
   initialPost: PostRecord;
   onBack: () => void;
   onOpenAuth: () => void;
+  onOpenAuthorProfile: (authorId: string) => void;
+  onSelectHashtag: (tag: string) => void;
   onPostUpdated: (updated: PostRecord) => void;
   onPostDeleted: (postId: string) => void;
   onOpenAssistant: (post: PostRecord, initialPrompt?: string) => void;
@@ -44,11 +50,14 @@ export function PostDetailView({
   initialPost,
   onBack,
   onOpenAuth,
+  onOpenAuthorProfile,
+  onSelectHashtag,
   onPostUpdated,
   onPostDeleted,
   onOpenAssistant,
 }: PostDetailViewProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
+  const { isPostSaved, busySavePostIds, toggleSavePost } = useSocial();
   const [post, setPost] = useState<PostRecord>(initialPost);
   const [isTogglingLike, setIsTogglingLike] = useState(false);
   const [isTogglingPin, setIsTogglingPin] = useState(false);
@@ -173,10 +182,20 @@ export function PostDetailView({
     }
   }
 
+  async function handleToggleSave() {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    await toggleSavePost(post.id);
+  }
+
   const isActualidad = post.mode === 'actualidad';
   const canModerate = Boolean(isOwner || (user && user.id === post.author_id));
   const authorName = getAuthorDisplayName(post.author);
   const readMinutes = estimateReadMinutes(post.content);
+  const saved = isPostSaved(post.id);
+  const isSavingBookmark = Boolean(busySavePostIds[post.id]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 pb-24 sm:px-6 md:px-8 md:py-10 md:pb-16">
@@ -304,20 +323,36 @@ export function PostDetailView({
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-[var(--border-subtle)] py-4 transition-colors duration-300">
             <div className="flex items-center gap-3 min-w-0">
-              <Avatar
-                src={post.author?.avatar_url}
-                name={post.author?.username}
-                size="md"
-              />
+              <button
+                type="button"
+                onClick={() => onOpenAuthorProfile(post.author_id)}
+                aria-label={`Ver perfil de ${authorName}`}
+                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Avatar
+                  src={post.author?.avatar_url}
+                  name={post.author?.username}
+                  size="md"
+                />
+              </button>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-[var(--text-main)] truncate">
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuthorProfile(post.author_id)}
+                    className="text-sm font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors truncate"
+                  >
                     {authorName}
-                  </p>
+                  </button>
                   <OwnerBadge
                     role={post.author?.role}
                     badge={post.author?.badge}
                     size="sm"
+                  />
+                  <FollowButton
+                    targetUserId={post.author_id}
+                    onOpenAuth={onOpenAuth}
+                    size="xs"
                   />
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -376,7 +411,7 @@ export function PostDetailView({
             {post.content}
           </div>
 
-          <div className="mt-9 flex items-center gap-3 pt-4">
+          <div className="mt-9 flex flex-wrap items-center gap-3 pt-4">
             <button
               type="button"
               onClick={handleToggleLike}
@@ -401,6 +436,25 @@ export function PostDetailView({
               <span className="text-xs opacity-80">Me gusta</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => void handleToggleSave()}
+              disabled={isSavingBookmark}
+              aria-pressed={saved}
+              className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                saved
+                  ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              <Bookmark
+                size={16}
+                className={saved ? 'fill-current' : ''}
+                aria-hidden="true"
+              />
+              <span>{saved ? 'Guardado' : 'Guardar'}</span>
+            </button>
+
             <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[var(--text-muted)]">
               <MessageSquare size={17} aria-hidden="true" />
               <span className="tabular-nums">{post.comments_count}</span>
@@ -419,39 +473,58 @@ export function PostDetailView({
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <Avatar
-              src={post.author?.avatar_url}
-              name={post.author?.username}
-              size="md"
-            />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span className="font-semibold text-[var(--text-main)] truncate max-w-[180px]">
-                  {authorName}
-                </span>
-                <OwnerBadge
-                  role={post.author?.role}
-                  badge={post.author?.badge}
-                  size="sm"
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => onOpenAuthorProfile(post.author_id)}
+                aria-label={`Ver perfil de ${authorName}`}
+                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Avatar
+                  src={post.author?.avatar_url}
+                  name={post.author?.username}
+                  size="md"
                 />
-                <span aria-hidden="true" className="text-[var(--text-muted)]">
-                  ·
-                </span>
-                <span className="text-xs font-semibold text-[var(--accent-primary)]">
-                  {post.category}
-                </span>
-                <span aria-hidden="true" className="text-[var(--text-muted)]">
-                  ·
-                </span>
-                <time
-                  dateTime={post.created_at}
-                  className="text-xs text-[var(--text-muted)] tabular-nums"
-                >
-                  {formatRelativeDate(post.created_at)}
-                </time>
+              </button>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuthorProfile(post.author_id)}
+                    className="font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors truncate max-w-[180px]"
+                  >
+                    {authorName}
+                  </button>
+                  <OwnerBadge
+                    role={post.author?.role}
+                    badge={post.author?.badge}
+                    size="sm"
+                  />
+                  <span aria-hidden="true" className="text-[var(--text-muted)]">
+                    ·
+                  </span>
+                  <span className="text-xs font-semibold text-[var(--accent-primary)]">
+                    {post.category}
+                  </span>
+                  <span aria-hidden="true" className="text-[var(--text-muted)]">
+                    ·
+                  </span>
+                  <time
+                    dateTime={post.created_at}
+                    className="text-xs text-[var(--text-muted)] tabular-nums"
+                  >
+                    {formatRelativeDate(post.created_at)}
+                  </time>
+                </div>
               </div>
             </div>
+
+            <FollowButton
+              targetUserId={post.author_id}
+              onOpenAuth={onOpenAuth}
+              size="sm"
+            />
           </div>
 
           {post.title && (
@@ -461,7 +534,10 @@ export function PostDetailView({
           )}
 
           <p className="mt-3.5 reading-prose text-[var(--text-main)] whitespace-pre-line break-words">
-            {post.content}
+            <HashtagText
+              text={post.content}
+              onSelectHashtag={onSelectHashtag}
+            />
           </p>
 
           {post.image_url && (
@@ -476,7 +552,7 @@ export function PostDetailView({
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={handleToggleLike}
@@ -499,6 +575,25 @@ export function PostDetailView({
                 />
                 <span className="tabular-nums">{post.likes_count}</span>
                 <span className="text-xs opacity-80">Me gusta</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleToggleSave()}
+                disabled={isSavingBookmark}
+                aria-pressed={saved}
+                className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                  saved
+                    ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Bookmark
+                  size={16}
+                  className={saved ? 'fill-current' : ''}
+                  aria-hidden="true"
+                />
+                <span>{saved ? 'Guardado' : 'Guardar'}</span>
               </button>
 
               <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[var(--text-muted)]">

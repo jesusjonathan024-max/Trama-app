@@ -3,13 +3,16 @@ import {
   AlertCircle,
   ArrowDownUp,
   ArrowLeft,
+  BookMarked,
   BookOpen,
   ChevronRight,
+  Heart,
   Loader2,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
 import {
   deleteChapter,
   deleteSeries,
@@ -23,14 +26,21 @@ import {
   type SeriesRecord,
 } from '../lib/library';
 import { formatEditorialDate, getAuthorDisplayName } from '../lib/posts';
+import {
+  READING_STATUS_OPTIONS,
+  type ReadingStatus,
+} from '../lib/social';
 import { Avatar } from './Avatar';
 import { CreateChapterModal } from './CreateChapterModal';
+import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
 interface SeriesDetailViewProps {
   initialSeries: SeriesRecord;
   onBack: () => void;
+  onOpenAuth: () => void;
+  onOpenAuthorProfile: (authorId: string) => void;
   onOpenChapter: (
     series: SeriesRecord,
     chaptersAscending: ChapterRecord[],
@@ -43,11 +53,19 @@ interface SeriesDetailViewProps {
 export function SeriesDetailView({
   initialSeries,
   onBack,
+  onOpenAuth,
+  onOpenAuthorProfile,
   onOpenChapter,
   onSeriesDeleted,
   onSeriesChanged,
 }: SeriesDetailViewProps) {
-  const { user, isOwner } = useAuth();
+  const { user, isAuthenticated, isOwner } = useAuth();
+  const {
+    getSeriesCollection,
+    setSeriesStatus,
+    toggleSeriesFavorite,
+    busySeriesIds,
+  } = useSocial();
   const [series, setSeries] = useState<SeriesRecord>(initialSeries);
   const [chapters, setChapters] = useState<ChapterRecord[]>([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
@@ -128,6 +146,27 @@ export function SeriesDetailView({
   const canModerate = Boolean(isOwner || isCreator);
   const isManhwa = isManhwaType(series.type);
   const authorName = getAuthorDisplayName(series.author);
+  const collectionEntry = getSeriesCollection(series.id);
+  const isFavorite = Boolean(collectionEntry?.is_favorite);
+  const currentReadingStatus = collectionEntry?.status ?? '';
+  const isUpdatingCollection = Boolean(busySeriesIds[series.id]);
+
+  async function handleReadingStatusChange(raw: string) {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    const nextStatus = raw ? (raw as ReadingStatus) : null;
+    await setSeriesStatus(series.id, nextStatus);
+  }
+
+  async function handleToggleFavorite() {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    await toggleSeriesFavorite(series.id);
+  }
 
   function handleStartOrContinue() {
     if (ascendingChapters.length === 0) return;
@@ -287,17 +326,28 @@ export function SeriesDetailView({
             </h1>
 
             <div className="mt-4 flex flex-wrap items-center gap-2.5">
-              <Avatar
-                src={series.author?.avatar_url}
-                name={series.author?.username}
-                size="sm"
-              />
-              <span className="text-sm font-medium text-[var(--text-main)]">
-                {authorName}
-              </span>
+              <button
+                type="button"
+                onClick={() => onOpenAuthorProfile(series.author_id)}
+                className="inline-flex items-center gap-2 rounded-lg text-left hover:text-[var(--accent-primary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Avatar
+                  src={series.author?.avatar_url}
+                  name={series.author?.username}
+                  size="sm"
+                />
+                <span className="text-sm font-medium text-[var(--text-main)]">
+                  {authorName}
+                </span>
+              </button>
               <OwnerBadge
                 role={series.author?.role}
                 badge={series.author?.badge}
+                size="sm"
+              />
+              <FollowButton
+                targetUserId={series.author_id}
+                onOpenAuth={onOpenAuth}
                 size="sm"
               />
             </div>
@@ -312,36 +362,89 @@ export function SeriesDetailView({
             </div>
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            {ascendingChapters.length > 0 && (
-              <button
-                type="button"
-                onClick={handleStartOrContinue}
-                className="min-h-[48px] flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-              >
-                <BookOpen size={17} aria-hidden="true" />
-                <span>
-                  {continueChapterIndex >= 0
-                    ? `Continuar Cap. ${formatChapterNumber(
-                        ascendingChapters[continueChapterIndex].chapter_number
-                      )}`
-                    : `Empezar Cap. ${formatChapterNumber(
-                        ascendingChapters[0].chapter_number
-                      )}`}
-                </span>
-              </button>
-            )}
+          {/* Controles de lectura, lista personal y favorita */}
+          <div className="mt-7 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {ascendingChapters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleStartOrContinue}
+                  className="min-h-[48px] flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                >
+                  <BookOpen size={17} aria-hidden="true" />
+                  <span>
+                    {continueChapterIndex >= 0
+                      ? `Continuar Cap. ${formatChapterNumber(
+                          ascendingChapters[continueChapterIndex].chapter_number
+                        )}`
+                      : `Empezar Cap. ${formatChapterNumber(
+                          ascendingChapters[0].chapter_number
+                        )}`}
+                  </span>
+                </button>
+              )}
 
-            {isCreator && (
+              {isCreator && (
+                <button
+                  type="button"
+                  onClick={() => setIsChapterModalOpen(true)}
+                  className="min-h-[48px] flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-5 py-3 text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--bg-elevated)] active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                >
+                  <Plus size={17} aria-hidden="true" />
+                  <span>Subir Capítulo</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <div className="relative flex-1 sm:flex-none sm:min-w-[210px]">
+                <BookMarked
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
+                <label htmlFor="detail-reading-status" className="sr-only">
+                  Estado de lectura
+                </label>
+                <select
+                  id="detail-reading-status"
+                  value={currentReadingStatus}
+                  disabled={isUpdatingCollection}
+                  onChange={(e) => void handleReadingStatusChange(e.target.value)}
+                  className={`min-h-[44px] w-full rounded-xl border pl-9 pr-3 text-xs font-semibold transition-colors duration-300 focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 ${
+                    currentReadingStatus
+                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-main)]'
+                  }`}
+                >
+                  <option value="">Sin estado de lectura</option>
+                  {READING_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setIsChapterModalOpen(true)}
-                className="min-h-[48px] flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-5 py-3 text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--bg-elevated)] active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                onClick={() => void handleToggleFavorite()}
+                disabled={isUpdatingCollection}
+                aria-pressed={isFavorite}
+                className={`min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl border px-4 text-xs font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                  isFavorite
+                    ? 'border-rose-500/40 bg-rose-500/12 text-rose-600 dark:text-rose-200'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                }`}
               >
-                <Plus size={17} aria-hidden="true" />
-                <span>Subir Capítulo</span>
+                <Heart
+                  size={15}
+                  className={isFavorite ? 'fill-current' : ''}
+                  aria-hidden="true"
+                />
+                <span>{isFavorite ? 'Favorita' : 'Marcar favorita'}</span>
               </button>
-            )}
+            </div>
           </div>
         </div>
       </div>

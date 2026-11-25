@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Bookmark,
   Clock,
+  Flame,
+  Hash,
   Heart,
   MessageSquare,
   PenSquare,
@@ -10,10 +13,18 @@ import {
   PinOff,
   Sparkles,
   Trash2,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocial } from '../context/SocialContext';
+import {
+  formatHashtagDisplay,
+  getPopularHashtags,
+  normalizeHashtag,
+  postHasHashtag,
+} from '../lib/hashtags';
 import {
   COMUNIDAD_CATEGORIES,
   deletePost,
@@ -26,38 +37,50 @@ import {
   togglePostPin,
   type PostRecord,
 } from '../lib/posts';
+import { sortPostsByMode, type FeedSortMode } from '../lib/social';
 import { Avatar } from './Avatar';
 import { EditPostModal } from './EditPostModal';
+import { FollowButton } from './FollowButton';
+import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
 
 interface ComunidadFeedProps {
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
+  selectedHashtag: string | null;
+  onSelectHashtag: (tag: string | null) => void;
   refreshKey: number;
   syncedPostUpdate: PostRecord | null;
   deletedPostId: string | null;
   onSelectPost: (post: PostRecord) => void;
+  onOpenAuthorProfile: (authorId: string) => void;
   onOpenAuth: () => void;
   onOpenCreate: () => void;
   onOpenAssistant: () => void;
 }
 
-const FILTER_OPTIONS = ['Todos', ...COMUNIDAD_CATEGORIES] as const;
+const FILTER_OPTIONS = ['Todos', 'Siguiendo', ...COMUNIDAD_CATEGORIES] as const;
 
 export function ComunidadFeed({
   selectedCategory,
   onSelectCategory,
+  selectedHashtag,
+  onSelectHashtag,
   refreshKey,
   syncedPostUpdate,
   deletedPostId,
   onSelectPost,
+  onOpenAuthorProfile,
   onOpenAuth,
   onOpenCreate,
   onOpenAssistant,
 }: ComunidadFeedProps) {
   const { user, isAuthenticated, isOwner } = useAuth();
+  const { followingIds, isPostSaved, busySavePostIds, toggleSavePost } =
+    useSocial();
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [sortMode, setSortMode] = useState<FeedSortMode>('recent');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -104,13 +127,42 @@ export function ComunidadFeed({
     setPosts((prev) => prev.filter((item) => item.id !== deletedPostId));
   }, [deletedPostId]);
 
+  const popularHashtags = useMemo(() => getPopularHashtags(posts, 10), [posts]);
+
   const filteredPosts = useMemo(() => {
-    const base =
-      selectedCategory === 'Todos'
-        ? posts
-        : posts.filter((post) => post.category === selectedCategory);
-    return sortPostsWithPinnedFirst(base);
-  }, [posts, selectedCategory]);
+    let base = posts;
+    if (selectedCategory === 'Siguiendo') {
+      base = posts.filter((post) => followingIds.has(post.author_id));
+    } else if (selectedCategory !== 'Todos') {
+      base = posts.filter((post) => post.category === selectedCategory);
+    }
+
+    if (selectedHashtag) {
+      base = base.filter((post) => postHasHashtag(post, selectedHashtag));
+    }
+
+    return sortPostsByMode(base, sortMode);
+  }, [posts, selectedCategory, followingIds, selectedHashtag, sortMode]);
+
+  async function handleToggleSave(postId: string) {
+    if (!isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+    await toggleSavePost(postId);
+  }
+
+  function handleSelectHashtagChip(tag: string) {
+    const normalizedClicked = normalizeHashtag(tag);
+    const normalizedActive = selectedHashtag
+      ? normalizeHashtag(selectedHashtag)
+      : '';
+    if (normalizedClicked && normalizedClicked === normalizedActive) {
+      onSelectHashtag(null);
+    } else {
+      onSelectHashtag(formatHashtagDisplay(tag));
+    }
+  }
 
   async function handleToggleLike(post: PostRecord) {
     if (!isAuthenticated || !user) {
@@ -242,31 +294,133 @@ export function ComunidadFeed({
             </button>
           </div>
 
-          <div
-            role="tablist"
-            aria-label="Filtrar hilos por categoría"
-            className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0"
-          >
-            {FILTER_OPTIONS.map((category) => {
-              const isActive = selectedCategory === category;
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => onSelectCategory(category)}
-                  className={`min-h-[40px] rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
-                    isActive
-                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
-                      : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
-                  }`}
-                >
-                  {category}
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              role="tablist"
+              aria-label="Filtrar hilos por categoría"
+              className="no-scrollbar -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+            >
+              {FILTER_OPTIONS.map((category) => {
+                const isActive = selectedCategory === category;
+                const isFollowingTab = category === 'Siguiendo';
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => onSelectCategory(category)}
+                    className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isActive
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
+                        : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    }`}
+                  >
+                    {isFollowingTab && (
+                      <UserCheck size={14} aria-hidden="true" />
+                    )}
+                    <span>{category}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              role="group"
+              aria-label="Ordenar hilos"
+              className="inline-flex self-start sm:self-auto shrink-0 items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1 transition-colors duration-300"
+            >
+              <button
+                type="button"
+                onClick={() => setSortMode('recent')}
+                aria-pressed={sortMode === 'recent'}
+                className={`min-h-[34px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  sortMode === 'recent'
+                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Clock size={13} aria-hidden="true" />
+                <span>Recientes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('popular')}
+                aria-pressed={sortMode === 'popular'}
+                className={`min-h-[34px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  sortMode === 'popular'
+                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Flame size={13} aria-hidden="true" />
+                <span>Populares</span>
+              </button>
+            </div>
           </div>
+
+          {/* Barra de hashtags populares + hashtag activo */}
+          {(popularHashtags.length > 0 || selectedHashtag) && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)]">
+                <Hash size={12} aria-hidden="true" />
+                <span>Tendencias:</span>
+              </span>
+
+              {selectedHashtag &&
+                !popularHashtags.some(
+                  (tag) => tag.key === normalizeHashtag(selectedHashtag)
+                ) && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectHashtag(null)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-primary)] transition-colors"
+                  >
+                    <span>{formatHashtagDisplay(selectedHashtag)}</span>
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                )}
+
+              {popularHashtags.map((tag) => {
+                const isSelected =
+                  selectedHashtag !== null &&
+                  normalizeHashtag(selectedHashtag) === tag.key;
+                return (
+                  <button
+                    key={tag.key}
+                    type="button"
+                    onClick={() => handleSelectHashtagChip(tag.display)}
+                    aria-pressed={isSelected}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                      isSelected
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-fg)]'
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--accent-primary)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]'
+                    }`}
+                  >
+                    <span>{tag.display}</span>
+                    <span
+                      className={`text-[10px] tabular-nums ${
+                        isSelected ? 'opacity-90' : 'text-[var(--text-muted)]'
+                      }`}
+                    >
+                      {tag.count}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {selectedHashtag && (
+                <button
+                  type="button"
+                  onClick={() => onSelectHashtag(null)}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors"
+                >
+                  <X size={12} aria-hidden="true" />
+                  <span>Limpiar filtro</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -338,20 +492,33 @@ export function ComunidadFeed({
             <Users size={22} aria-hidden="true" />
           </div>
           <h2 className="mt-4 font-display text-xl font-semibold text-[var(--text-main)]">
-            {selectedCategory === 'Todos'
-              ? 'Todavía no hay hilos en la comunidad'
-              : `No hay hilos en ${selectedCategory}`}
+            {selectedHashtag
+              ? `Sin hilos con ${formatHashtagDisplay(selectedHashtag)}`
+              : selectedCategory === 'Siguiendo'
+                ? !isAuthenticated
+                  ? 'Inicia sesión para ver tu feed de Siguiendo'
+                  : 'Aún no hay hilos de personas que sigues'
+                : selectedCategory === 'Todos'
+                  ? 'Todavía no hay hilos en la comunidad'
+                  : `No hay hilos en ${selectedCategory}`}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-            {selectedCategory === 'Todos'
-              ? 'Lanza una pregunta, recomendación o debate para encender la conversación.'
-              : 'Explora otra categoría o inicia el primer hilo aquí.'}
+            {selectedHashtag
+              ? 'Prueba con otra etiqueta o limpia el filtro para ver toda la conversación.'
+              : selectedCategory === 'Siguiendo'
+                ? 'Sigue a autores y lectores desde sus publicaciones o perfiles para ver sus hilos aquí.'
+                : selectedCategory === 'Todos'
+                  ? 'Lanza una pregunta, recomendación o debate con hashtags como #Anime o #Gaming.'
+                  : 'Explora otra categoría o inicia el primer hilo aquí.'}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {selectedCategory !== 'Todos' && (
+            {(selectedCategory !== 'Todos' || selectedHashtag) && (
               <button
                 type="button"
-                onClick={() => onSelectCategory('Todos')}
+                onClick={() => {
+                  onSelectCategory('Todos');
+                  onSelectHashtag(null);
+                }}
                 className="min-h-[44px] rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 Ver todos los hilos
@@ -406,16 +573,27 @@ export function ComunidadFeed({
 
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <Avatar
-                        src={thread.author?.avatar_url}
-                        name={thread.author?.username}
-                        size="md"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => onOpenAuthorProfile(thread.author_id)}
+                        aria-label={`Ver perfil de ${authorName}`}
+                        className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                      >
+                        <Avatar
+                          src={thread.author?.avatar_url}
+                          name={thread.author?.username}
+                          size="md"
+                        />
+                      </button>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-sm font-semibold text-[var(--text-main)] max-w-[180px]">
+                          <button
+                            type="button"
+                            onClick={() => onOpenAuthorProfile(thread.author_id)}
+                            className="truncate text-sm font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors max-w-[170px]"
+                          >
                             {authorName}
-                          </span>
+                          </button>
                           <OwnerBadge
                             role={thread.author?.role}
                             badge={thread.author?.badge}
@@ -445,40 +623,55 @@ export function ComunidadFeed({
                         </div>
                       </div>
                     </div>
+
+                    <FollowButton
+                      targetUserId={thread.author_id}
+                      onOpenAuth={onOpenAuth}
+                      size="xs"
+                    />
                   </div>
                 </div>
 
-                {/* ZONA 2: CUERPO */}
+                {/* ZONA 2: CUERPO (sin botones anidados para que los hashtags sean clicables) */}
                 <div className="px-4 pt-3.5 pb-4 sm:px-5">
-                  <button
-                    type="button"
-                    onClick={() => onSelectPost(thread)}
-                    className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded-lg"
-                  >
-                    {thread.title && (
+                  {thread.title && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPost(thread)}
+                      className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] rounded-lg"
+                    >
                       <h2 className="font-display text-lg font-bold leading-snug text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors duration-300 sm:text-xl">
                         {thread.title}
                       </h2>
-                    )}
-                    <p
-                      className={`${
-                        thread.title ? 'mt-2' : ''
-                      } reading-prose-compact text-[var(--text-secondary)] whitespace-pre-line break-words`}
-                    >
-                      {thread.content}
-                    </p>
+                    </button>
+                  )}
 
-                    {thread.image_url && (
-                      <div className="mt-3.5 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
-                        <MediaImage
-                          src={thread.image_url}
-                          alt={thread.title || 'Imagen adjunta al hilo'}
-                          className="max-h-96 w-full object-cover"
-                          fallbackClassName="h-48 w-full"
-                        />
-                      </div>
-                    )}
-                  </button>
+                  <div
+                    onClick={() => onSelectPost(thread)}
+                    className={`${
+                      thread.title ? 'mt-2' : ''
+                    } cursor-pointer reading-prose-compact text-[var(--text-secondary)] whitespace-pre-line break-words`}
+                  >
+                    <HashtagText
+                      text={thread.content}
+                      onSelectHashtag={handleSelectHashtagChip}
+                    />
+                  </div>
+
+                  {thread.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPost(thread)}
+                      className="mt-3.5 block w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                    >
+                      <MediaImage
+                        src={thread.image_url}
+                        alt={thread.title || 'Imagen adjunta al hilo'}
+                        className="max-h-96 w-full object-cover"
+                        fallbackClassName="h-48 w-full"
+                      />
+                    </button>
+                  )}
                 </div>
 
                 {/* ZONA 3: PIE (Reacciones, Comentarios y Moderación) */}
@@ -526,6 +719,34 @@ export function ComunidadFeed({
                           {thread.comments_count}
                         </span>
                         <span className="hidden sm:inline">Comentarios</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleSave(thread.id)}
+                        disabled={Boolean(busySavePostIds[thread.id])}
+                        aria-pressed={isPostSaved(thread.id)}
+                        aria-label={
+                          isPostSaved(thread.id)
+                            ? 'Quitar de guardados'
+                            : 'Guardar hilo'
+                        }
+                        className={`min-h-[42px] inline-flex items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                          isPostSaved(thread.id)
+                            ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                        }`}
+                      >
+                        <Bookmark
+                          size={15}
+                          className={
+                            isPostSaved(thread.id) ? 'fill-current' : ''
+                          }
+                          aria-hidden="true"
+                        />
+                        <span>
+                          {isPostSaved(thread.id) ? 'Guardado' : 'Guardar'}
+                        </span>
                       </button>
                     </div>
 
