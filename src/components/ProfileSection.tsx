@@ -76,6 +76,7 @@ import { AppearanceControls } from './AppearanceControls';
 import { Avatar } from './Avatar';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { OwnerGameModerationPanel } from './OwnerGameModerationPanel';
 import { WriterStatsCard } from './WriterStatsCard';
 
 interface ProfileSectionProps {
@@ -1813,6 +1814,9 @@ export function ProfileSection({
               );
             })()}
           </div>
+
+          {/* Moderación de Juegos enviados por la comunidad (Sandbox aislado) */}
+          <OwnerGameModerationPanel />
         </div>
       )}
 

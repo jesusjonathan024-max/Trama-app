@@ -60,6 +60,7 @@ export interface PostRecord {
   is_verified: boolean;
   views_count: number;
   is_pinned: boolean;
+  community_id: string | null;
   created_at: string;
   author: PostAuthor | null;
   likes_count: number;
@@ -106,6 +107,7 @@ interface RawPostRow {
   views_count?: number | null;
   likes_count: number | null;
   is_pinned?: boolean | null;
+  community_id?: string | null;
   created_at: string;
   author: PostAuthor | PostAuthor[] | null;
   comments: RawCountItem[] | null;
@@ -160,6 +162,7 @@ function mapRawPost(
     is_verified: Boolean(row.is_verified),
     views_count: typeof row.views_count === 'number' ? row.views_count : 0,
     is_pinned: Boolean(row.is_pinned),
+    community_id: row.community_id ?? null,
     created_at: row.created_at,
     author: normalizeAuthor(row.author),
     likes_count: likesFromRelation ?? row.likes_count ?? 0,
@@ -187,6 +190,7 @@ const POST_SELECT_WITH_PIN = `
   views_count,
   likes_count,
   is_pinned,
+  community_id,
   created_at,
   author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
   comments(count),
@@ -206,6 +210,7 @@ const POST_SELECT_BASE = `
   is_verified,
   views_count,
   likes_count,
+  community_id,
   created_at,
   author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
   comments(count),
@@ -492,11 +497,14 @@ export async function createPost(params: {
   imageUrl: string | null;
   sourceName?: string | null;
   sourceUrl?: string | null;
+  communityId?: string | null;
 }): Promise<string> {
   const normalizedSourceName =
     params.mode === 'actualidad' ? params.sourceName?.trim() || null : null;
   const normalizedSourceUrl =
     params.mode === 'actualidad' ? params.sourceUrl?.trim() || null : null;
+  const normalizedCommunityId =
+    params.mode === 'comunidad' ? params.communityId?.trim() || null : null;
 
   if (normalizedSourceUrl && !isStrictHttpsUrl(normalizedSourceUrl)) {
     throw new Error(
@@ -515,6 +523,7 @@ export async function createPost(params: {
       image_url: params.imageUrl,
       source_name: normalizedSourceName,
       source_url: normalizedSourceUrl,
+      community_id: normalizedCommunityId,
     })
     .select('id')
     .single();

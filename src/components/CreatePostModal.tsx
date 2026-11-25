@@ -23,6 +23,7 @@ import {
   createPostPoll,
   type PollDurationOption,
 } from '../lib/phase3';
+import { fetchCommunities, type CommunityRecord } from '../lib/phase4';
 import {
   ACTUALIDAD_CATEGORIES,
   ALLOWED_IMAGE_TYPES,
@@ -37,6 +38,7 @@ import { isStrictHttpsUrl } from '../lib/supabase';
 interface CreatePostModalProps {
   isOpen: boolean;
   defaultMode: PostMode;
+  defaultCommunityId?: string | null;
   onClose: () => void;
   onCreated: (mode: PostMode) => void;
 }
@@ -47,6 +49,7 @@ const MAX_CONTENT_LENGTH = 12000;
 export function CreatePostModal({
   isOpen,
   defaultMode,
+  defaultCommunityId = null,
   onClose,
   onCreated,
 }: CreatePostModalProps) {
@@ -54,6 +57,10 @@ export function CreatePostModal({
   const { unlockByKeys } = useAchievements();
   const [mode, setMode] = useState<PostMode>(defaultMode);
   const [category, setCategory] = useState<string>(ACTUALIDAD_CATEGORIES[0]);
+  const [communities, setCommunities] = useState<CommunityRecord[]>([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string>(
+    defaultCommunityId ?? ''
+  );
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sourceName, setSourceName] = useState('');
@@ -77,8 +84,14 @@ export function CreatePostModal({
         ? ACTUALIDAD_CATEGORIES[0]
         : COMUNIDAD_CATEGORIES[0]
     );
+    setSelectedCommunityId(defaultCommunityId ?? '');
     setErrorMsg(null);
-  }, [isOpen, defaultMode]);
+    fetchCommunities(user?.id)
+      .then((list) => setCommunities(list))
+      .catch(() => {
+        // Ignora fallo auxiliar
+      });
+  }, [isOpen, defaultMode, defaultCommunityId, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -152,6 +165,7 @@ export function CreatePostModal({
     setContent('');
     setSourceName('');
     setSourceUrl('');
+    setSelectedCommunityId('');
     setIncludePoll(false);
     setPollQuestion('');
     setPollOptions(['', '']);
@@ -246,6 +260,10 @@ export function CreatePostModal({
         imageUrl: uploadedImageUrl,
         sourceName: mode === 'actualidad' ? trimmedSourceName || null : null,
         sourceUrl: mode === 'actualidad' ? trimmedSourceUrl || null : null,
+        communityId:
+          mode === 'comunidad' && selectedCommunityId
+            ? selectedCommunityId
+            : null,
       });
 
       if (mode === 'comunidad' && includePoll) {
@@ -391,6 +409,32 @@ export function CreatePostModal({
               })}
             </div>
           </div>
+
+          {/* Comunidad / Grupo opcional (solo en modo Comunidad) */}
+          {mode === 'comunidad' && communities.length > 0 && (
+            <div>
+              <label
+                htmlFor="post-community-select"
+                className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
+              >
+                Comunidad / Grupo (opcional)
+              </label>
+              <select
+                id="post-community-select"
+                value={selectedCommunityId}
+                onChange={(e) => setSelectedCommunityId(e.target.value)}
+                className="min-h-[44px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+              >
+                <option value="">Comunidad general (sin grupo específico)</option>
+                {communities.map((comm) => (
+                  <option key={comm.id} value={comm.id}>
+                    {comm.icon} {comm.name} ({comm.members_count}{' '}
+                    {comm.members_count === 1 ? 'miembro' : 'miembros'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Título (obligatorio en Actualidad, opcional en Comunidad) */}
           <div>

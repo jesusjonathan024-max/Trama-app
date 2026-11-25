@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { ActualidadFeed } from './components/ActualidadFeed';
 import { AiAssistantDrawer } from './components/AiAssistantDrawer';
@@ -12,6 +12,7 @@ import { ChapterReaderView } from './components/ChapterReaderView';
 import { ComunidadFeed } from './components/ComunidadFeed';
 import { CreatePostModal } from './components/CreatePostModal';
 import { CreateSeriesModal } from './components/CreateSeriesModal';
+import { DirectMessagesModal } from './components/DirectMessagesModal';
 import { Navbar, type ActiveView } from './components/Navbar';
 import { PostDetailView } from './components/PostDetailView';
 import { ProfileSection } from './components/ProfileSection';
@@ -27,9 +28,11 @@ import {
   type ChapterRecord,
   type SeriesRecord,
 } from './lib/library';
+import { fetchUnreadDirectMessageCount } from './lib/phase4';
 import {
   fetchPostById,
   getAuthorDisplayName,
+  type PostAuthor,
   type PostMode,
   type PostRecord,
 } from './lib/posts';
@@ -53,6 +56,9 @@ function AppShell() {
   const [actualidadCategory, setActualidadCategory] = useState('Todas');
   const [comunidadCategory, setComunidadCategory] = useState('Todos');
   const [comunidadHashtag, setComunidadHashtag] = useState<string | null>(null);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
+    null
+  );
   const [selectedPost, setSelectedPost] = useState<PostRecord | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     null
@@ -62,6 +68,13 @@ function AppShell() {
   );
   const [deletedPostId, setDeletedPostId] = useState<string | null>(null);
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+
+  // Estado de Mensajes Directos
+  const [isDmModalOpen, setIsDmModalOpen] = useState(false);
+  const [dmTargetPartner, setDmTargetPartner] = useState<PostAuthor | null>(
+    null
+  );
+  const [unreadDmCount, setUnreadDmCount] = useState(0);
 
   // Estado de Biblioteca
   const [bibliotecaFilter, setBibliotecaFilter] =
@@ -80,6 +93,44 @@ function AppShell() {
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [aiContext, setAiContext] = useState<AiChatContext | null>(null);
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | null>(null);
+
+  const refreshUnreadDms = useCallback(async () => {
+    if (!user?.id) {
+      setUnreadDmCount(0);
+      return;
+    }
+    try {
+      const count = await fetchUnreadDirectMessageCount(user.id);
+      setUnreadDmCount(count);
+    } catch {
+      // Mantiene contador actual
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadDmCount(0);
+      setIsDmModalOpen(false);
+      return;
+    }
+    void refreshUnreadDms();
+    const timer = window.setInterval(() => {
+      void refreshUnreadDms();
+    }, 45_000);
+    return () => window.clearInterval(timer);
+  }, [user?.id, refreshUnreadDms]);
+
+  const handleOpenMessagesModal = useCallback(
+    (partner: PostAuthor | null = null) => {
+      if (!isAuthenticated) {
+        setIsAuthModalOpen(true);
+        return;
+      }
+      setDmTargetPartner(partner);
+      setIsDmModalOpen(true);
+    },
+    [isAuthenticated]
+  );
 
   const openSectionAssistant = useCallback((section: 'actualidad' | 'comunidad') => {
     setAiContext({ section });
@@ -315,6 +366,8 @@ function AppShell() {
         onOpenCreate={handleOpenGlobalCreate}
         onOpenNotificationPost={(postId) => void handleOpenNotificationPost(postId)}
         onOpenNotificationProfile={handleOpenAuthorProfile}
+        unreadDmCount={unreadDmCount}
+        onOpenMessages={() => handleOpenMessagesModal(null)}
       />
 
       {socialError && (
@@ -365,6 +418,7 @@ function AppShell() {
             onOpenOwnProfile={() => handleSelectView('perfil')}
             onSelectPost={handleSelectPost}
             onSelectSeries={handleSelectSeries}
+            onMessageUser={(target) => handleOpenMessagesModal(target)}
           />
         ) : activeView === 'perfil' ? (
           <ProfileSection
@@ -396,6 +450,8 @@ function AppShell() {
             onSelectCategory={setComunidadCategory}
             selectedHashtag={comunidadHashtag}
             onSelectHashtag={setComunidadHashtag}
+            selectedCommunityId={selectedCommunityId}
+            onSelectCommunityId={setSelectedCommunityId}
             refreshKey={feedRefreshKey}
             syncedPostUpdate={syncedPostUpdate}
             deletedPostId={deletedPostId}
@@ -406,7 +462,7 @@ function AppShell() {
             onOpenAssistant={() => openSectionAssistant('comunidad')}
           />
         ) : activeView === 'arcade' ? (
-          <ArcadeSection />
+          <ArcadeSection onOpenAuth={() => setIsAuthModalOpen(true)} />
         ) : (
           <BibliotecaCatalog
             selectedFilter={bibliotecaFilter}
@@ -439,6 +495,9 @@ function AppShell() {
       <CreatePostModal
         isOpen={isCreatePostModalOpen}
         defaultMode={defaultCreatePostMode}
+        defaultCommunityId={
+          defaultCreatePostMode === 'comunidad' ? selectedCommunityId : null
+        }
         onClose={() => setIsCreatePostModalOpen(false)}
         onCreated={handlePostCreated}
       />
@@ -447,6 +506,17 @@ function AppShell() {
         isOpen={isCreateSeriesModalOpen}
         onClose={() => setIsCreateSeriesModalOpen(false)}
         onCreated={handleSeriesCreated}
+      />
+
+      <DirectMessagesModal
+        isOpen={isDmModalOpen}
+        initialPartner={dmTargetPartner}
+        onClose={() => {
+          setIsDmModalOpen(false);
+          void refreshUnreadDms();
+        }}
+        onOpenProfile={handleOpenAuthorProfile}
+        onUnreadChanged={() => void refreshUnreadDms()}
       />
 
       <AiAssistantDrawer

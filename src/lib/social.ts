@@ -498,6 +498,7 @@ interface RawAuthorPostRow {
   views_count?: number | null;
   likes_count: number | null;
   is_pinned?: boolean | null;
+  community_id?: string | null;
   created_at: string;
   author: PostAuthor | PostAuthor[] | null;
   comments: Array<{ count?: number }> | null;
@@ -538,6 +539,7 @@ function mapSimplePostRows(
       is_verified: Boolean(row.is_verified),
       views_count: typeof row.views_count === 'number' ? row.views_count : 0,
       is_pinned: Boolean(row.is_pinned),
+      community_id: row.community_id ?? null,
       created_at: row.created_at,
       author,
       likes_count: likesCount,
@@ -568,6 +570,7 @@ export async function fetchPostsByAuthor(
       views_count,
       likes_count,
       is_pinned,
+      community_id,
       created_at,
       author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
       comments(count),
@@ -626,6 +629,7 @@ export async function fetchPostsByIds(
       views_count,
       likes_count,
       is_pinned,
+      community_id,
       created_at,
       author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
       comments(count),

@@ -6,6 +6,7 @@ import {
   Gamepad2,
   Heart,
   Loader2,
+  Mail,
   MessageSquare,
   Moon,
   Newspaper,
@@ -84,6 +85,8 @@ interface NavbarProps {
   onOpenCreate: () => void;
   onOpenNotificationPost: (postId: string) => void;
   onOpenNotificationProfile: (userId: string) => void;
+  unreadDmCount?: number;
+  onOpenMessages?: () => void;
 }
 
 export function Navbar({
@@ -93,6 +96,8 @@ export function Navbar({
   onOpenCreate,
   onOpenNotificationPost,
   onOpenNotificationProfile,
+  unreadDmCount = 0,
+  onOpenMessages,
 }: NavbarProps) {
   const { isAuthenticated, isLoadingSession, user, profile } = useAuth();
   const { themeMode } = useTheme();
@@ -298,6 +303,32 @@ export function Navbar({
                 </div>
               )}
             </div>
+
+            {/* Acceso a Mensajes Privados (visible para usuarios autenticados) */}
+            {isAuthenticated && onOpenMessages && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAppearanceOpen(false);
+                  setIsNotificationsOpen(false);
+                  onOpenMessages();
+                }}
+                aria-label={
+                  unreadDmCount > 0
+                    ? `Mensajes privados (${unreadDmCount} sin leer)`
+                    : 'Mensajes privados'
+                }
+                title="Mensajes privados"
+                className="relative min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Mail size={17} aria-hidden="true" />
+                {unreadDmCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--accent-primary)] px-1 text-[10px] font-bold leading-none text-[var(--accent-fg)] ring-2 ring-[var(--bg-base)] tabular-nums">
+                    {unreadDmCount > 9 ? '9+' : unreadDmCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Campana de Notificaciones (visible para usuarios autenticados) */}
             {isAuthenticated && (

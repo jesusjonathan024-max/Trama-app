@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Bookmark,
+  Check,
   Clock,
+  Compass,
   Flag,
   Flame,
   Hash,
@@ -12,6 +14,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Plus,
   Sparkles,
   Trash2,
   UserCheck,
@@ -29,6 +32,12 @@ import {
 import { fetchUserReportedPostIds } from '../lib/phase2';
 import { fetchPollsByPostIds, type PostPollData } from '../lib/phase3';
 import {
+  fetchCommunities,
+  joinCommunity,
+  leaveCommunity,
+  type CommunityRecord,
+} from '../lib/phase4';
+import {
   COMUNIDAD_CATEGORIES,
   deletePost,
   estimateReadMinutes,
@@ -42,6 +51,7 @@ import {
 } from '../lib/posts';
 import { sortPostsByMode, type FeedSortMode } from '../lib/social';
 import { Avatar } from './Avatar';
+import { CreateCommunityModal } from './CreateCommunityModal';
 import { EditPostModal } from './EditPostModal';
 import { FollowButton } from './FollowButton';
 import { HashtagText } from './HashtagText';
@@ -55,6 +65,8 @@ interface ComunidadFeedProps {
   onSelectCategory: (category: string) => void;
   selectedHashtag: string | null;
   onSelectHashtag: (tag: string | null) => void;
+  selectedCommunityId: string | null;
+  onSelectCommunityId: (communityId: string | null) => void;
   refreshKey: number;
   syncedPostUpdate: PostRecord | null;
   deletedPostId: string | null;
@@ -72,6 +84,8 @@ export function ComunidadFeed({
   onSelectCategory,
   selectedHashtag,
   onSelectHashtag,
+  selectedCommunityId,
+  onSelectCommunityId,
   refreshKey,
   syncedPostUpdate,
   deletedPostId,
@@ -85,6 +99,12 @@ export function ComunidadFeed({
   const { followingIds, isPostSaved, busySavePostIds, toggleSavePost } =
     useSocial();
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [communities, setCommunities] = useState<CommunityRecord[]>([]);
+  const [isLoadingCommunities, setIsLoadingCommunities] = useState(true);
+  const [busyCommunityIds, setBusyCommunityIds] = useState<
+    Record<string, boolean>
+  >({});
+  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
   const [sortMode, setSortMode] = useState<FeedSortMode>('recent');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -101,6 +121,22 @@ export function ComunidadFeed({
   const [pollsByPostId, setPollsByPostId] = useState<
     Record<string, PostPollData>
   >({});
+
+  const loadCommunitiesList = useCallback(async () => {
+    setIsLoadingCommunities(true);
+    try {
+      const list = await fetchCommunities(user?.id);
+      setCommunities(list);
+    } catch {
+      // Mantiene lista actual si falla lectura auxiliar
+    } finally {
+      setIsLoadingCommunities(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void loadCommunitiesList();
+  }, [loadCommunitiesList, refreshKey]);
 
   const loadThreads = useCallback(async () => {
     setIsLoading(true);
@@ -163,14 +199,28 @@ export function ComunidadFeed({
     setPosts((prev) => prev.filter((item) => item.id !== deletedPostId));
   }, [deletedPostId]);
 
+  const communitiesById = useMemo(
+    () => new Map(communities.map((c) => [c.id, c])),
+    [communities]
+  );
+
+  const activeCommunity = selectedCommunityId
+    ? communitiesById.get(selectedCommunityId) ?? null
+    : null;
+
   const popularHashtags = useMemo(() => getPopularHashtags(posts, 10), [posts]);
 
   const filteredPosts = useMemo(() => {
     let base = posts;
+
+    if (selectedCommunityId) {
+      base = base.filter((post) => post.community_id === selectedCommunityId);
+    }
+
     if (selectedCategory === 'Siguiendo') {
-      base = posts.filter((post) => followingIds.has(post.author_id));
+      base = base.filter((post) => followingIds.has(post.author_id));
     } else if (selectedCategory !== 'Todos') {
-      base = posts.filter((post) => post.category === selectedCategory);
+      base = base.filter((post) => post.category === selectedCategory);
     }
 
     if (selectedHashtag) {
@@ -178,7 +228,58 @@ export function ComunidadFeed({
     }
 
     return sortPostsByMode(base, sortMode);
-  }, [posts, selectedCategory, followingIds, selectedHashtag, sortMode]);
+  }, [
+    posts,
+    selectedCommunityId,
+    selectedCategory,
+    followingIds,
+    selectedHashtag,
+    sortMode,
+  ]);
+
+  async function handleToggleCommunityMembership(comm: CommunityRecord) {
+    if (!isAuthenticated || !user) {
+      onOpenAuth();
+      return;
+    }
+    if (busyCommunityIds[comm.id]) return;
+
+    const nextMember = !comm.is_member;
+    setBusyCommunityIds((prev) => ({ ...prev, [comm.id]: true }));
+    setCommunities((prev) =>
+      prev.map((item) =>
+        item.id === comm.id
+          ? {
+              ...item,
+              is_member: nextMember,
+              members_count: Math.max(
+                0,
+                item.members_count + (nextMember ? 1 : -1)
+              ),
+            }
+          : item
+      )
+    );
+
+    try {
+      if (nextMember) {
+        await joinCommunity(comm.id, user.id);
+      } else {
+        await leaveCommunity(comm.id, user.id);
+      }
+    } catch (err) {
+      setCommunities((prev) =>
+        prev.map((item) => (item.id === comm.id ? comm : item))
+      );
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar tu membresía en la comunidad.'
+      );
+    } finally {
+      setBusyCommunityIds((prev) => ({ ...prev, [comm.id]: false }));
+    }
+  }
 
   async function handleToggleSave(postId: string) {
     if (!isAuthenticated) {
@@ -328,6 +429,170 @@ export function ComunidadFeed({
               <Sparkles size={15} aria-hidden="true" />
               <span>Asistente IA</span>
             </button>
+          </div>
+
+          {/* Selector superior de Grupos / Sub-comunidades */}
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3.5 sm:p-4 transition-colors duration-300">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-main)]">
+                <Compass
+                  size={15}
+                  className="text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
+                <span>Grupos y Comunidades</span>
+                {communities.length > 0 && (
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
+                    ({communities.length})
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    onOpenAuth();
+                    return;
+                  }
+                  setIsCreateCommunityOpen(true);
+                }}
+                className="min-h-[34px] inline-flex items-center gap-1 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors"
+              >
+                <Plus size={13} aria-hidden="true" />
+                <span>Crear grupo</span>
+              </button>
+            </div>
+
+            <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() => onSelectCommunityId(null)}
+                aria-pressed={selectedCommunityId === null}
+                className={`min-h-[42px] inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  selectedCommunityId === null
+                    ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <span>🌐</span>
+                <span>Todos los grupos</span>
+              </button>
+
+              {isLoadingCommunities && communities.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-[42px] w-32 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
+                  <div className="h-[42px] w-36 animate-pulse rounded-xl bg-[var(--bg-subtle)]" />
+                </div>
+              ) : (
+                communities.map((comm) => {
+                  const isSelected = selectedCommunityId === comm.id;
+                  const isBusy = Boolean(busyCommunityIds[comm.id]);
+                  return (
+                    <div
+                      key={comm.id}
+                      className={`inline-flex shrink-0 items-center overflow-hidden rounded-xl border transition-colors ${
+                        isSelected
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] hover:border-[var(--accent-border)]'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectCommunityId(isSelected ? null : comm.id)
+                        }
+                        className="min-h-[40px] inline-flex items-center gap-1.5 px-3 text-xs font-semibold text-[var(--text-main)] hover:text-[var(--accent-primary)] transition-colors whitespace-nowrap"
+                      >
+                        <span aria-hidden="true">{comm.icon}</span>
+                        <span>{comm.name}</span>
+                        <span className="text-[10px] font-medium text-[var(--text-muted)] tabular-nums">
+                          {comm.members_count}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void handleToggleCommunityMembership(comm)
+                        }
+                        title={
+                          comm.is_member
+                            ? `Salir de ${comm.name}`
+                            : `Unirse a ${comm.name}`
+                        }
+                        className={`min-h-[40px] border-l border-[var(--border-subtle)] px-2.5 text-[11px] font-semibold transition-colors whitespace-nowrap ${
+                          comm.is_member
+                            ? 'text-emerald-600 dark:text-emerald-300 hover:text-red-500'
+                            : 'text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)]'
+                        }`}
+                      >
+                        {comm.is_member ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Check size={11} aria-hidden="true" />
+                            <span>Unido</span>
+                          </span>
+                        ) : (
+                          'Unirse'
+                        )}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {activeCommunity && (
+              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)]/50 px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base" aria-hidden="true">
+                      {activeCommunity.icon}
+                    </span>
+                    <p className="truncate font-display text-sm font-bold text-[var(--text-main)]">
+                      {activeCommunity.name}
+                    </p>
+                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                      · {activeCommunity.members_count}{' '}
+                      {activeCommunity.members_count === 1
+                        ? 'miembro'
+                        : 'miembros'}
+                    </span>
+                  </div>
+                  {activeCommunity.description && (
+                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                      {activeCommunity.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={Boolean(busyCommunityIds[activeCommunity.id])}
+                    onClick={() =>
+                      void handleToggleCommunityMembership(activeCommunity)
+                    }
+                    className={`min-h-[34px] rounded-lg border px-3 text-xs font-semibold transition-colors ${
+                      activeCommunity.is_member
+                        ? 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-red-500/40 hover:text-red-500'
+                        : 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-fg)] hover:bg-[var(--accent-hover)]'
+                    }`}
+                  >
+                    {activeCommunity.is_member ? 'Salir del grupo' : 'Unirme'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSelectCommunityId(null)}
+                    aria-label="Quitar filtro de comunidad"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -528,32 +793,39 @@ export function ComunidadFeed({
             <Users size={22} aria-hidden="true" />
           </div>
           <h2 className="mt-4 font-display text-xl font-semibold text-[var(--text-main)]">
-            {selectedHashtag
-              ? `Sin hilos con ${formatHashtagDisplay(selectedHashtag)}`
-              : selectedCategory === 'Siguiendo'
-                ? !isAuthenticated
-                  ? 'Inicia sesión para ver tu feed de Siguiendo'
-                  : 'Aún no hay hilos de personas que sigues'
-                : selectedCategory === 'Todos'
-                  ? 'Todavía no hay hilos en la comunidad'
-                  : `No hay hilos en ${selectedCategory}`}
+            {activeCommunity
+              ? `Aún no hay hilos en ${activeCommunity.icon} ${activeCommunity.name}`
+              : selectedHashtag
+                ? `Sin hilos con ${formatHashtagDisplay(selectedHashtag)}`
+                : selectedCategory === 'Siguiendo'
+                  ? !isAuthenticated
+                    ? 'Inicia sesión para ver tu feed de Siguiendo'
+                    : 'Aún no hay hilos de personas que sigues'
+                  : selectedCategory === 'Todos'
+                    ? 'Todavía no hay hilos en la comunidad'
+                    : `No hay hilos en ${selectedCategory}`}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-            {selectedHashtag
-              ? 'Prueba con otra etiqueta o limpia el filtro para ver toda la conversación.'
-              : selectedCategory === 'Siguiendo'
-                ? 'Sigue a autores y lectores desde sus publicaciones o perfiles para ver sus hilos aquí.'
-                : selectedCategory === 'Todos'
-                  ? 'Lanza una pregunta, recomendación o debate con hashtags como #Anime o #Gaming.'
-                  : 'Explora otra categoría o inicia el primer hilo aquí.'}
+            {activeCommunity
+              ? 'Sé el primero en abrir una conversación dentro de este grupo o explora otros grupos arriba.'
+              : selectedHashtag
+                ? 'Prueba con otra etiqueta o limpia el filtro para ver toda la conversación.'
+                : selectedCategory === 'Siguiendo'
+                  ? 'Sigue a autores y lectores desde sus publicaciones o perfiles para ver sus hilos aquí.'
+                  : selectedCategory === 'Todos'
+                    ? 'Lanza una pregunta, recomendación o debate con hashtags como #Anime o #Gaming.'
+                    : 'Explora otra categoría o inicia el primer hilo aquí.'}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {(selectedCategory !== 'Todos' || selectedHashtag) && (
+            {(selectedCategory !== 'Todos' ||
+              selectedHashtag ||
+              selectedCommunityId) && (
               <button
                 type="button"
                 onClick={() => {
                   onSelectCategory('Todos');
                   onSelectHashtag(null);
+                  onSelectCommunityId(null);
                 }}
                 className="min-h-[44px] rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
@@ -640,6 +912,26 @@ export function ComunidadFeed({
                           <span className="font-semibold text-[var(--accent-primary)]">
                             {thread.category}
                           </span>
+                          {thread.community_id &&
+                            communitiesById.get(thread.community_id) && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onSelectCommunityId(thread.community_id)
+                                  }
+                                  className="inline-flex items-center gap-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+                                >
+                                  <span aria-hidden="true">
+                                    {communitiesById.get(thread.community_id)?.icon}
+                                  </span>
+                                  <span>
+                                    {communitiesById.get(thread.community_id)?.name}
+                                  </span>
+                                </button>
+                              </>
+                            )}
                           <span aria-hidden="true">·</span>
                           <time
                             dateTime={thread.created_at}
@@ -926,6 +1218,15 @@ export function ComunidadFeed({
         onSubmitted={(postId) =>
           setReportedPostIds((prev) => new Set(prev).add(postId))
         }
+      />
+
+      <CreateCommunityModal
+        isOpen={isCreateCommunityOpen}
+        onClose={() => setIsCreateCommunityOpen(false)}
+        onCreated={(created) => {
+          setCommunities((prev) => [created, ...prev]);
+          onSelectCommunityId(created.id);
+        }}
       />
     </section>
   );

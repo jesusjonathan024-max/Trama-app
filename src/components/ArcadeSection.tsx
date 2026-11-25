@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
+  Code2,
   Crown,
   Eye,
   EyeOff,
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   Sparkles,
   Star,
+  Swords,
   Target,
   Trash2,
   Trophy,
@@ -43,8 +45,21 @@ import {
   getLocalDailyChallengeBest,
   getTodayStartIso,
 } from '../lib/phase3';
-import { ArcadeGameModal } from './ArcadeGameModal';
+import {
+  completeArcadeChallenge,
+  createArcadeChallenge,
+  fetchUserArcadeChallenges,
+  type ArcadeChallengeRecord,
+  type DuelGameId,
+} from '../lib/phase4';
+import { getAuthorDisplayName, type PostAuthor } from '../lib/posts';
+import { ArcadeChallengesPanel } from './ArcadeChallengesPanel';
+import {
+  ArcadeGameModal,
+  type ArcadeChallengeMode,
+} from './ArcadeGameModal';
 import { Avatar } from './Avatar';
+import { CommunityArcadePanel } from './CommunityArcadePanel';
 import { OwnerBadge } from './OwnerBadge';
 
 function GamePreviewArtwork({ game }: { game: ArcadeGameConfig }) {
@@ -135,13 +150,37 @@ function GamePreviewArtwork({ game }: { game: ArcadeGameConfig }) {
   );
 }
 
-export function ArcadeSection() {
+type ArcadeSectionTab = 'oficiales' | 'retos' | 'comunidad';
+
+type ActiveDuelContext =
+  | {
+      kind: 'create';
+      gameId: DuelGameId;
+      opponent: PostAuthor;
+    }
+  | {
+      kind: 'accept';
+      challenge: ArcadeChallengeRecord;
+    };
+
+interface ArcadeSectionProps {
+  onOpenAuth?: () => void;
+}
+
+export function ArcadeSection({ onOpenAuth }: ArcadeSectionProps = {}) {
   const { user, isOwner } = useAuth();
+  const [sectionTab, setSectionTab] = useState<ArcadeSectionTab>('oficiales');
   const [games, setGames] = useState<ArcadeGameConfig[]>(() => loadArcadeGames());
   const [highScores, setHighScores] = useState<Record<string, number>>(() =>
     getArcadeHighScores()
   );
   const [activeGame, setActiveGame] = useState<ArcadeGameConfig | null>(null);
+  const [activeDuel, setActiveDuel] = useState<ActiveDuelContext | null>(null);
+
+  // Retos 1v1 entre amigos (public.arcade_challenges)
+  const [challenges, setChallenges] = useState<ArcadeChallengeRecord[]>([]);
+  const [isLoadingChallenges, setIsLoadingChallenges] = useState(false);
+  const [challengesError, setChallengesError] = useState<string | null>(null);
 
   // Reto Diario y Récords Personales sincronizados con Supabase
   const dailyChallenge = useMemo(() => getDailyArcadeChallenge(), []);
@@ -173,6 +212,110 @@ export function ArcadeSection() {
   const [selectedEngine, setSelectedEngine] = useState<ArcadeEngineId>('astral');
   const [isGenerating, setIsGenerating] = useState(false);
   const [creatorError, setCreatorError] = useState<string | null>(null);
+
+  const loadChallenges = useCallback(async () => {
+    if (!user?.id) {
+      setChallenges([]);
+      return;
+    }
+    setIsLoadingChallenges(true);
+    setChallengesError(null);
+    try {
+      const list = await fetchUserArcadeChallenges(user.id);
+      setChallenges(list);
+    } catch (err) {
+      setChallengesError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron cargar tus retos 1v1.'
+      );
+    } finally {
+      setIsLoadingChallenges(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void loadChallenges();
+  }, [loadChallenges]);
+
+  const pendingIncomingChallengesCount = useMemo(
+    () =>
+      challenges.filter(
+        (c) =>
+          user?.id &&
+          c.challenged_id === user.id &&
+          c.status.toLowerCase() !== 'completed'
+      ).length,
+    [challenges, user?.id]
+  );
+
+  function handleLaunchCreateDuel(gameId: DuelGameId, opponent: PostAuthor) {
+    const targetGame =
+      games.find((g) => g.id === gameId) ?? games[0] ?? null;
+    if (!targetGame) return;
+    setActiveDuel({ kind: 'create', gameId, opponent });
+    setActiveGame(targetGame);
+  }
+
+  function handleLaunchAcceptDuel(challenge: ArcadeChallengeRecord) {
+    const targetGame =
+      games.find((g) => g.id === challenge.game_id) ?? games[0] ?? null;
+    if (!targetGame) return;
+    setActiveDuel({ kind: 'accept', challenge });
+    setActiveGame(targetGame);
+  }
+
+  const activeChallengeMode: ArcadeChallengeMode | null = useMemo(() => {
+    if (!activeDuel) return null;
+    if (activeDuel.kind === 'create') {
+      return {
+        kind: 'create',
+        opponentName: getAuthorDisplayName(activeDuel.opponent),
+      };
+    }
+    return {
+      kind: 'accept',
+      opponentName: getAuthorDisplayName(activeDuel.challenge.challenger),
+      targetScore: activeDuel.challenge.challenger_score,
+    };
+  }, [activeDuel]);
+
+  const handleDuelMatchFinished = useCallback(
+    async (finalScore: number): Promise<string | null> => {
+      if (!user?.id || !activeDuel) return null;
+
+      if (activeDuel.kind === 'create') {
+        await createArcadeChallenge({
+          gameId: activeDuel.gameId,
+          challengerId: user.id,
+          challengedId: activeDuel.opponent.id,
+          challengerScore: finalScore,
+        });
+        void loadChallenges();
+        return `¡Reto enviado a ${getAuthorDisplayName(activeDuel.opponent)} con ${finalScore.toLocaleString('es-ES')} pts!`;
+      }
+
+      const target = activeDuel.challenge.challenger_score;
+      const challengerName = getAuthorDisplayName(
+        activeDuel.challenge.challenger
+      );
+      await completeArcadeChallenge({
+        challengeId: activeDuel.challenge.id,
+        challengedId: user.id,
+        challengedScore: finalScore,
+      });
+      void loadChallenges();
+
+      if (finalScore > target) {
+        return `¡Ganaste el duelo contra ${challengerName}! (${finalScore.toLocaleString('es-ES')} vs ${target.toLocaleString('es-ES')} pts)`;
+      }
+      if (finalScore === target) {
+        return `¡Empate contra ${challengerName}! (${finalScore.toLocaleString('es-ES')} pts cada uno)`;
+      }
+      return `Duelo completado · Ganó ${challengerName} (${target.toLocaleString('es-ES')} vs ${finalScore.toLocaleString('es-ES')} pts)`;
+    },
+    [user?.id, activeDuel, loadChallenges]
+  );
 
   const refreshHighScores = useCallback(() => {
     setHighScores(getArcadeHighScores());
@@ -393,8 +536,79 @@ export function ArcadeSection() {
         )}
       </div>
 
-      {/* Reto del Día + Mis Récords personales */}
-      <div className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-12">
+      {/* Pestañas internas del Arcade (Oficiales, Retos 1v1, Arcade de la Comunidad) */}
+      <div
+        role="tablist"
+        aria-label="Secciones de Arcade"
+        className="no-scrollbar mt-5 flex items-center gap-2 overflow-x-auto pb-1"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sectionTab === 'oficiales'}
+          onClick={() => setSectionTab('oficiales')}
+          className={`min-h-[42px] inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
+            sectionTab === 'oficiales'
+              ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          <Gamepad2 size={15} aria-hidden="true" />
+          <span>Oficiales y Rankings</span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sectionTab === 'retos'}
+          onClick={() => setSectionTab('retos')}
+          className={`min-h-[42px] inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
+            sectionTab === 'retos'
+              ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          <Swords size={15} aria-hidden="true" />
+          <span>Retos 1v1</span>
+          {pendingIncomingChallengesCount > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--accent-primary)] px-1.5 text-[10px] font-bold text-[var(--accent-fg)] tabular-nums">
+              {pendingIncomingChallengesCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sectionTab === 'comunidad'}
+          onClick={() => setSectionTab('comunidad')}
+          className={`min-h-[42px] inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
+            sectionTab === 'comunidad'
+              ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          <Code2 size={15} aria-hidden="true" />
+          <span>Arcade de la Comunidad</span>
+        </button>
+      </div>
+
+      {sectionTab === 'retos' ? (
+        <ArcadeChallengesPanel
+          challenges={challenges}
+          isLoading={isLoadingChallenges}
+          errorMsg={challengesError}
+          onRefresh={() => void loadChallenges()}
+          onOpenAuth={() => onOpenAuth?.()}
+          onLaunchCreateDuel={handleLaunchCreateDuel}
+          onLaunchAcceptDuel={handleLaunchAcceptDuel}
+        />
+      ) : sectionTab === 'comunidad' ? (
+        <CommunityArcadePanel onOpenAuth={() => onOpenAuth?.()} />
+      ) : (
+        <>
+          {/* Reto del Día + Mis Récords personales */}
+          <div className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* Tarjeta destacada: Reto del Día */}
         <div
           aria-labelledby="daily-challenge-heading"
@@ -1029,11 +1243,18 @@ export function ArcadeSection() {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Modal de juego HTML5 Canvas */}
       <ArcadeGameModal
         game={activeGame}
-        onClose={() => setActiveGame(null)}
+        challengeMode={activeChallengeMode}
+        onMatchFinished={activeDuel ? handleDuelMatchFinished : undefined}
+        onClose={() => {
+          setActiveGame(null);
+          setActiveDuel(null);
+        }}
         onHighScoreUpdated={refreshHighScores}
       />
 

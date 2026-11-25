@@ -5,6 +5,7 @@ import {
   BookOpen,
   Calendar,
   Heart,
+  Mail,
   MessageSquare,
   Newspaper,
   UserRound,
@@ -15,6 +16,7 @@ import type { SeriesRecord } from '../lib/library';
 import {
   formatEditorialDate,
   formatRelativeDate,
+  type PostAuthor,
   type PostRecord,
 } from '../lib/posts';
 import {
@@ -39,6 +41,7 @@ interface PublicProfileViewProps {
   onOpenOwnProfile: () => void;
   onSelectPost: (post: PostRecord) => void;
   onSelectSeries: (series: SeriesRecord) => void;
+  onMessageUser?: (target: PostAuthor) => void;
 }
 
 type ProfileTab = 'publicaciones' | 'biblioteca';
@@ -50,6 +53,7 @@ export function PublicProfileView({
   onOpenOwnProfile,
   onSelectPost,
   onSelectSeries,
+  onMessageUser,
 }: PublicProfileViewProps) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
@@ -212,7 +216,30 @@ export function PublicProfileView({
               </div>
 
               {!isOwnProfile && (
-                <div className="shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {onMessageUser && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!user) {
+                          onOpenAuth();
+                          return;
+                        }
+                        onMessageUser({
+                          id: profile.id,
+                          username: profile.username,
+                          avatar_url: profile.avatar_url,
+                          role: profile.role,
+                          badge: profile.badge,
+                        });
+                      }}
+                      className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-xs font-semibold text-[var(--text-main)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-primary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                    >
+                      <Mail size={14} aria-hidden="true" />
+                      <span>Mensaje</span>
+                    </button>
+                  )}
+
                   <FollowButton
                     targetUserId={profile.id}
                     onOpenAuth={onOpenAuth}

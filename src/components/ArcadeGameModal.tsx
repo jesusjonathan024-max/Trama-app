@@ -28,8 +28,16 @@ import {
   saveLocalDailyChallengeBest,
 } from '../lib/phase3';
 
+export interface ArcadeChallengeMode {
+  kind: 'create' | 'accept';
+  opponentName: string;
+  targetScore?: number;
+}
+
 interface ArcadeGameModalProps {
   game: ArcadeGameConfig | null;
+  challengeMode?: ArcadeChallengeMode | null;
+  onMatchFinished?: (score: number) => Promise<string | null> | void;
   onClose: () => void;
   onHighScoreUpdated: () => void;
 }
@@ -309,6 +317,8 @@ function randomEdgeSpawn(width: number, height: number, margin: number) {
 
 export function ArcadeGameModal({
   game,
+  challengeMode = null,
+  onMatchFinished,
   onClose,
   onHighScoreUpdated,
 }: ArcadeGameModalProps) {
@@ -319,6 +329,10 @@ export function ArcadeGameModal({
   const [bestScore, setBestScore] = useState(0);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [completedDailyRun, setCompletedDailyRun] = useState(false);
+  const [duelStatus, setDuelStatus] = useState<
+    'idle' | 'saving' | 'done' | 'error'
+  >('idle');
+  const [duelSummary, setDuelSummary] = useState<string | null>(null);
   const [globalScoreStatus, setGlobalScoreStatus] = useState<
     'idle' | 'saving' | 'saved' | 'not_higher' | 'guest' | 'error'
   >('idle');
@@ -342,6 +356,9 @@ export function ArcadeGameModal({
   userIdRef.current = user?.id ?? null;
   const checkArcadeAchievementsRef = useRef(checkArcadeAchievements);
   checkArcadeAchievementsRef.current = checkArcadeAchievements;
+  const onMatchFinishedRef = useRef(onMatchFinished);
+  onMatchFinishedRef.current = onMatchFinished;
+  const duelSubmittedRef = useRef(false);
 
   // Entrada de teclado en 8 direcciones (X y Y)
   const keysRef = useRef<{
@@ -383,6 +400,9 @@ export function ArcadeGameModal({
     setPhase('TITLE_MENU');
     setIsNewRecord(false);
     setCompletedDailyRun(false);
+    setDuelStatus('idle');
+    setDuelSummary(null);
+    duelSubmittedRef.current = false;
     setGlobalScoreStatus('idle');
     setGlobalScoreNote(null);
     setHud({
@@ -394,7 +414,7 @@ export function ArcadeGameModal({
       charge: game.engine === 'astral' ? 100 : 40,
       powerupLabel: null,
     });
-  }, [game]);
+  }, [game, challengeMode]);
 
   const startNewRun = useCallback(() => {
     if (!game) return;
@@ -672,6 +692,25 @@ export function ArcadeGameModal({
         syncHud();
         synth.gameOver();
         setPhase('GAME_OVER');
+
+        if (onMatchFinishedRef.current && !duelSubmittedRef.current) {
+          duelSubmittedRef.current = true;
+          setDuelStatus('saving');
+          setDuelSummary(null);
+          Promise.resolve(onMatchFinishedRef.current(finalScore))
+            .then((summaryText) => {
+              setDuelStatus('done');
+              setDuelSummary(summaryText ?? 'Resultado del duelo registrado.');
+            })
+            .catch((err: unknown) => {
+              setDuelStatus('error');
+              setDuelSummary(
+                err instanceof Error
+                  ? err.message
+                  : 'No se pudo guardar el resultado del duelo 1v1.'
+              );
+            });
+        }
 
         const activeUserId = userIdRef.current;
         if (!activeUserId) {
@@ -1846,6 +1885,26 @@ export function ArcadeGameModal({
           {/* PANTALLA DE TÍTULO (TITLE_MENU) */}
           {phase === 'TITLE_MENU' && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080B12] px-6 text-center">
+              {challengeMode && (
+                <div className="mb-4 max-w-xs rounded-xl border border-amber-400/45 bg-amber-400/12 px-3.5 py-2 text-xs text-amber-200">
+                  {challengeMode.kind === 'create' ? (
+                    <span>
+                      <strong>Reto 1v1 contra {challengeMode.opponentName}</strong>
+                      : tu puntaje final se enviará automáticamente como marca a vencer.
+                    </span>
+                  ) : (
+                    <span>
+                      <strong>Duelo 1v1 vs {challengeMode.opponentName}</strong>
+                      : supera{' '}
+                      <strong className="tabular-nums text-white">
+                        {(challengeMode.targetScore ?? 0).toLocaleString('es-ES')} pts
+                      </strong>{' '}
+                      para ganar.
+                    </span>
+                  )}
+                </div>
+              )}
+
               <GameEmblemSvg game={game} />
               <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-amber-300">
                 {game.genre} · {formatDifficultyLabel(game.difficulty)}
@@ -1871,7 +1930,7 @@ export function ArcadeGameModal({
                 className="mt-6 min-h-[50px] min-w-[200px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-7 py-3 text-base font-bold text-[#06101F] hover:bg-[#529BFF] active:scale-[0.98] transition-all"
               >
                 <Play size={18} className="fill-current" aria-hidden="true" />
-                <span>Jugar</span>
+                <span>{challengeMode ? 'Iniciar duelo' : 'Jugar'}</span>
               </button>
 
               <p className="mt-5 text-xs text-[#7D879A]">
@@ -1931,6 +1990,25 @@ export function ArcadeGameModal({
                 <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
                   <CheckCircle2 size={14} aria-hidden="true" />
                   <span>¡Reto del Día completado!</span>
+                </div>
+              )}
+
+              {challengeMode && (
+                <div
+                  className={`mb-3 max-w-xs rounded-xl border px-3.5 py-2 text-xs font-semibold ${
+                    duelStatus === 'error'
+                      ? 'border-red-500/40 bg-red-500/15 text-red-200'
+                      : 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                  }`}
+                >
+                  {duelStatus === 'saving' ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                      <span>Guardando resultado del duelo 1v1…</span>
+                    </span>
+                  ) : (
+                    <span>{duelSummary || 'Duelo 1v1 finalizado.'}</span>
+                  )}
                 </div>
               )}
 
