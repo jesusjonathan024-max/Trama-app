@@ -14,6 +14,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
 import {
   formatDifficultyLabel,
@@ -22,6 +23,10 @@ import {
   submitGlobalArcadeScore,
   type ArcadeGameConfig,
 } from '../lib/arcade';
+import {
+  getDailyArcadeChallenge,
+  saveLocalDailyChallengeBest,
+} from '../lib/phase3';
 
 interface ArcadeGameModalProps {
   game: ArcadeGameConfig | null;
@@ -308,10 +313,12 @@ export function ArcadeGameModal({
   onHighScoreUpdated,
 }: ArcadeGameModalProps) {
   const { user } = useAuth();
+  const { checkArcadeAchievements } = useAchievements();
   const [phase, setPhase] = useState<GamePhase>('TITLE_MENU');
   const [muted, setMuted] = useState(false);
   const [bestScore, setBestScore] = useState(0);
   const [isNewRecord, setIsNewRecord] = useState(false);
+  const [completedDailyRun, setCompletedDailyRun] = useState(false);
   const [globalScoreStatus, setGlobalScoreStatus] = useState<
     'idle' | 'saving' | 'saved' | 'not_higher' | 'guest' | 'error'
   >('idle');
@@ -333,6 +340,8 @@ export function ArcadeGameModal({
   const synthRef = useRef<RetroSynth>(new RetroSynth());
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
+  const checkArcadeAchievementsRef = useRef(checkArcadeAchievements);
+  checkArcadeAchievementsRef.current = checkArcadeAchievements;
 
   // Entrada de teclado en 8 direcciones (X y Y)
   const keysRef = useRef<{
@@ -373,6 +382,7 @@ export function ArcadeGameModal({
     setBestScore(scores[game.id] ?? 0);
     setPhase('TITLE_MENU');
     setIsNewRecord(false);
+    setCompletedDailyRun(false);
     setGlobalScoreStatus('idle');
     setGlobalScoreNote(null);
     setHud({
@@ -391,6 +401,7 @@ export function ArcadeGameModal({
     pointerStateRef.current.pendingDx = 0;
     pointerStateRef.current.pendingDy = 0;
     setIsNewRecord(false);
+    setCompletedDailyRun(false);
     setGlobalScoreStatus('idle');
     setGlobalScoreNote(null);
     setPhase('PLAYING');
@@ -649,8 +660,15 @@ export function ArcadeGameModal({
         setIsNewRecord(beatRecord);
         if (beatRecord) {
           setBestScore(finalScore);
-          onHighScoreUpdated();
         }
+
+        const daily = getDailyArcadeChallenge();
+        saveLocalDailyChallengeBest(daily.dateKey, game.id, finalScore);
+        const didCompleteDaily =
+          game.id === daily.gameId && finalScore >= daily.targetScore;
+        setCompletedDailyRun(didCompleteDaily);
+
+        onHighScoreUpdated();
         syncHud();
         synth.gameOver();
         setPhase('GAME_OVER');
@@ -659,34 +677,41 @@ export function ArcadeGameModal({
         if (!activeUserId) {
           setGlobalScoreStatus('guest');
           setGlobalScoreNote(null);
-        } else if (finalScore > 0) {
-          setGlobalScoreStatus('saving');
-          setGlobalScoreNote(null);
-          void submitGlobalArcadeScore({
-            userId: activeUserId,
-            gameId: game.id,
+        } else {
+          void checkArcadeAchievementsRef.current({
             score: finalScore,
-          })
-            .then((result) => {
-              if (result.saved) {
-                setGlobalScoreStatus('saved');
-                setGlobalScoreNote(null);
-                onHighScoreUpdated();
-              } else {
-                setGlobalScoreStatus('not_higher');
-                setGlobalScoreNote(
-                  `Tu mejor récord global es ${result.bestScore.toLocaleString('es-ES')} pts.`
-                );
-              }
+            completedDailyChallenge: didCompleteDaily,
+          });
+
+          if (finalScore > 0) {
+            setGlobalScoreStatus('saving');
+            setGlobalScoreNote(null);
+            void submitGlobalArcadeScore({
+              userId: activeUserId,
+              gameId: game.id,
+              score: finalScore,
             })
-            .catch((err: unknown) => {
-              setGlobalScoreStatus('error');
-              setGlobalScoreNote(
-                err instanceof Error
-                  ? err.message
-                  : 'No se pudo guardar en el Top 10 Global.'
-              );
-            });
+              .then((result) => {
+                onHighScoreUpdated();
+                if (result.saved) {
+                  setGlobalScoreStatus('saved');
+                  setGlobalScoreNote(null);
+                } else {
+                  setGlobalScoreStatus('not_higher');
+                  setGlobalScoreNote(
+                    `Partida registrada en rankings · Tu mejor récord histórico es ${result.bestScore.toLocaleString('es-ES')} pts.`
+                  );
+                }
+              })
+              .catch((err: unknown) => {
+                setGlobalScoreStatus('error');
+                setGlobalScoreNote(
+                  err instanceof Error
+                    ? err.message
+                    : 'No se pudo guardar en el Top 10 Global.'
+                );
+              });
+          }
         }
       }
     };
@@ -1896,9 +1921,16 @@ export function ArcadeGameModal({
           {phase === 'GAME_OVER' && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080B12]/94 px-6 text-center">
               {isNewRecord && (
-                <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
                   <Trophy size={14} aria-hidden="true" />
                   <span>¡Nuevo récord personal!</span>
+                </div>
+              )}
+
+              {completedDailyRun && (
+                <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                  <span>¡Reto del Día completado!</span>
                 </div>
               )}
 

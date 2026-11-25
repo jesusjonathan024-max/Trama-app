@@ -267,17 +267,21 @@ export interface ArcadeLeaderboardPlayer {
   badge: string | null;
 }
 
+export type ArcadeLeaderboardPeriod = 'week' | 'month' | 'all';
+
 export interface ArcadeLeaderboardEntry {
   id: string;
   user_id: string;
   game_id: string;
   score: number;
   updated_at: string;
+  source: 'arcade_scores' | 'arcade_score_logs';
   player: ArcadeLeaderboardPlayer;
 }
 
 export interface GlobalScoreSubmitResult {
   saved: boolean;
+  logged: boolean;
   previousBest: number;
   bestScore: number;
 }
@@ -288,6 +292,14 @@ interface RawArcadeScoreRow {
   game_id: string;
   score: number;
   updated_at: string;
+}
+
+interface RawArcadeScoreLogRow {
+  id: string;
+  user_id: string;
+  game_id: string;
+  score: number;
+  played_at: string;
 }
 
 interface RawProfileLookupRow {
@@ -305,9 +317,26 @@ export async function submitGlobalArcadeScore(params: {
 }): Promise<GlobalScoreSubmitResult> {
   const cleanScore = Math.max(0, Math.floor(params.score));
   if (!params.userId || !params.gameId || cleanScore <= 0) {
-    return { saved: false, previousBest: 0, bestScore: 0 };
+    return { saved: false, logged: false, previousBest: 0, bestScore: 0 };
   }
 
+  const nowIso = new Date().toISOString();
+
+  // 1. Registra siempre la partida en el historial para rankings semanal/mensual y retos diarios
+  let logged = false;
+  const { error: logError } = await supabase.from('arcade_score_logs').insert({
+    user_id: params.userId,
+    game_id: params.gameId,
+    score: cleanScore,
+    played_at: nowIso,
+  });
+  if (!logError) {
+    logged = true;
+  } else {
+    console.warn('No se pudo registrar partida en arcade_score_logs:', logError.message);
+  }
+
+  // 2. Comprueba y actualiza el récord histórico en arcade_scores
   const { data: existingRows, error: lookupError } = await supabase
     .from('arcade_scores')
     .select('id, score')
@@ -326,12 +355,11 @@ export async function submitGlobalArcadeScore(params: {
   if (cleanScore <= previousBest) {
     return {
       saved: false,
+      logged,
       previousBest,
       bestScore: previousBest,
     };
   }
-
-  const nowIso = new Date().toISOString();
 
   const { error: upsertError } = await supabase.from('arcade_scores').upsert(
     {
@@ -370,43 +398,25 @@ export async function submitGlobalArcadeScore(params: {
 
   return {
     saved: true,
+    logged,
     previousBest,
     bestScore: cleanScore,
   };
 }
 
-export async function fetchArcadeLeaderboard(
-  gameId: string,
-  limit = 10
+async function hydratePlayersForRows(
+  rows: Array<{
+    id: string;
+    user_id: string;
+    game_id: string;
+    score: number;
+    timestamp: string;
+  }>,
+  source: 'arcade_scores' | 'arcade_score_logs'
 ): Promise<ArcadeLeaderboardEntry[]> {
-  if (!gameId) return [];
+  if (rows.length === 0) return [];
+  const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
 
-  const { data: scoreRows, error: scoresError } = await supabase
-    .from('arcade_scores')
-    .select('id, user_id, game_id, score, updated_at')
-    .eq('game_id', gameId)
-    .order('score', { ascending: false })
-    .order('updated_at', { ascending: true })
-    .limit(Math.max(limit * 3, 30));
-
-  if (scoresError) {
-    throw new Error(scoresError.message);
-  }
-
-  const rawRows = (scoreRows ?? []) as RawArcadeScoreRow[];
-  if (rawRows.length === 0) return [];
-
-  // Deduplicar conservando el puntaje más alto por usuario
-  const seenUsers = new Set<string>();
-  const topRows: RawArcadeScoreRow[] = [];
-  for (const row of rawRows) {
-    if (!row.user_id || seenUsers.has(row.user_id)) continue;
-    seenUsers.add(row.user_id);
-    topRows.push(row);
-    if (topRows.length >= limit) break;
-  }
-
-  const userIds = topRows.map((r) => r.user_id);
   const { data: profileRows, error: profilesError } = await supabase
     .from('profiles')
     .select('id, username, avatar_url, role, badge')
@@ -427,12 +437,13 @@ export async function fetchArcadeLeaderboard(
     });
   }
 
-  return topRows.map((row) => ({
+  return rows.map((row) => ({
     id: String(row.id),
     user_id: row.user_id,
     game_id: row.game_id,
     score: Math.max(0, Number(row.score) || 0),
-    updated_at: row.updated_at,
+    updated_at: row.timestamp,
+    source,
     player: profileMap.get(row.user_id) ?? {
       id: row.user_id,
       username: null,
@@ -443,9 +454,149 @@ export async function fetchArcadeLeaderboard(
   }));
 }
 
-export async function deleteArcadeScore(scoreId: string): Promise<void> {
+export async function fetchArcadeLeaderboard(
+  gameId: string,
+  limit = 10,
+  period: ArcadeLeaderboardPeriod = 'all'
+): Promise<ArcadeLeaderboardEntry[]> {
+  if (!gameId) return [];
+
+  if (period === 'all') {
+    const { data: scoreRows, error: scoresError } = await supabase
+      .from('arcade_scores')
+      .select('id, user_id, game_id, score, updated_at')
+      .eq('game_id', gameId)
+      .order('score', { ascending: false })
+      .order('updated_at', { ascending: true })
+      .limit(Math.max(limit * 3, 30));
+
+    if (scoresError) {
+      throw new Error(scoresError.message);
+    }
+
+    const rawRows = (scoreRows ?? []) as RawArcadeScoreRow[];
+    const seenUsers = new Set<string>();
+    const topRows: Array<{
+      id: string;
+      user_id: string;
+      game_id: string;
+      score: number;
+      timestamp: string;
+    }> = [];
+
+    for (const row of rawRows) {
+      if (!row.user_id || seenUsers.has(row.user_id)) continue;
+      seenUsers.add(row.user_id);
+      topRows.push({
+        id: String(row.id),
+        user_id: row.user_id,
+        game_id: row.game_id,
+        score: row.score,
+        timestamp: row.updated_at,
+      });
+      if (topRows.length >= limit) break;
+    }
+
+    return hydratePlayersForRows(topRows, 'arcade_scores');
+  }
+
+  // Semanal (7 días) o Mensual (30 días) desde arcade_score_logs agrupando el mejor puntaje por usuario
+  const days = period === 'week' ? 7 : 30;
+  const cutoffIso = new Date(Date.now() - days * 86400 * 1000).toISOString();
+
+  const { data: logRows, error: logsError } = await supabase
+    .from('arcade_score_logs')
+    .select('id, user_id, game_id, score, played_at')
+    .eq('game_id', gameId)
+    .gte('played_at', cutoffIso)
+    .order('score', { ascending: false })
+    .order('played_at', { ascending: true })
+    .limit(300);
+
+  if (logsError) {
+    throw new Error(logsError.message);
+  }
+
+  const rawLogs = (logRows ?? []) as RawArcadeScoreLogRow[];
+  const bestByUser = new Map<string, RawArcadeScoreLogRow>();
+  for (const row of rawLogs) {
+    if (!row.user_id) continue;
+    const prev = bestByUser.get(row.user_id);
+    if (!prev || Number(row.score) > Number(prev.score)) {
+      bestByUser.set(row.user_id, row);
+    }
+  }
+
+  const sortedTop = Array.from(bestByUser.values())
+    .sort((a, b) => {
+      if (Number(b.score) !== Number(a.score)) {
+        return Number(b.score) - Number(a.score);
+      }
+      return new Date(a.played_at).getTime() - new Date(b.played_at).getTime();
+    })
+    .slice(0, limit)
+    .map((row) => ({
+      id: String(row.id),
+      user_id: row.user_id,
+      game_id: row.game_id,
+      score: row.score,
+      timestamp: row.played_at,
+    }));
+
+  return hydratePlayersForRows(sortedTop, 'arcade_score_logs');
+}
+
+export async function fetchUserArcadeRecords(
+  userId: string
+): Promise<Record<string, number>> {
+  if (!userId) return {};
+
   const { data, error } = await supabase
     .from('arcade_scores')
+    .select('game_id, score')
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const records: Record<string, number> = {};
+  for (const row of (data ?? []) as Array<{ game_id: string; score: number }>) {
+    if (!row.game_id) continue;
+    const scoreVal = Math.max(0, Number(row.score) || 0);
+    if (scoreVal > (records[row.game_id] ?? 0)) {
+      records[row.game_id] = scoreVal;
+    }
+  }
+  return records;
+}
+
+export async function fetchTodayBestScoreForGame(
+  userId: string,
+  gameId: string,
+  todayStartIso: string
+): Promise<number> {
+  if (!userId || !gameId) return 0;
+
+  const { data, error } = await supabase
+    .from('arcade_score_logs')
+    .select('score')
+    .eq('user_id', userId)
+    .eq('game_id', gameId)
+    .gte('played_at', todayStartIso)
+    .order('score', { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) return 0;
+  return Math.max(0, Number((data[0] as { score: number }).score) || 0);
+}
+
+export async function deleteArcadeScore(
+  scoreId: string,
+  source: 'arcade_scores' | 'arcade_score_logs' = 'arcade_scores'
+): Promise<void> {
+  const { data, error } = await supabase
+    .from(source)
     .delete()
     .eq('id', scoreId)
     .select('id');
@@ -456,7 +607,7 @@ export async function deleteArcadeScore(scoreId: string): Promise<void> {
 
   if (!data || data.length === 0) {
     throw new Error(
-      'No se pudo eliminar el puntaje. Verifica que la política RLS de DELETE en arcade_scores permita al Dueño borrar registros ajenos.'
+      `No se pudo eliminar el puntaje. Verifica que la política RLS de DELETE en ${source} permita al Dueño borrar registros ajenos.`
     );
   }
 }

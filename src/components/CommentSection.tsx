@@ -13,6 +13,7 @@ import {
   Send,
   Trash2,
 } from 'lucide-react';
+import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
 import {
   buildCommentTree,
@@ -287,6 +288,7 @@ export function CommentSection({
   onCommentCountChange,
 }: CommentSectionProps) {
   const { user, profile, isAuthenticated, isOwner } = useAuth();
+  const { unlockByKeys } = useAchievements();
   const [comments, setComments] = useState<CommentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -376,6 +378,7 @@ export function CommentSection({
         return next;
       });
       setNewComment('');
+      void unlockByKeys(['first_comment']);
     } catch (err) {
       setSubmitError(
         err instanceof Error
@@ -417,6 +420,7 @@ export function CommentSection({
       onCommentCountChange?.(next.length);
       return next;
     });
+    void unlockByKeys(['first_comment']);
   }
 
   async function handleDeleteComment(commentId: string) {

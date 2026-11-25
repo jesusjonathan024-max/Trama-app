@@ -25,6 +25,7 @@ import {
   type FollowCounts,
   type PublicUserProfile,
 } from '../lib/social';
+import { AchievementsShowcase } from './AchievementsShowcase';
 import { Avatar } from './Avatar';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
@@ -269,6 +270,12 @@ export function PublicProfileView({
 
           {/* Estadísticas de Escritor y Lectura */}
           <WriterStatsCard userId={profile.id} />
+
+          {/* Vitrina de Logros del usuario */}
+          <AchievementsShowcase
+            userId={profile.id}
+            heading="Vitrina de Logros"
+          />
 
           {/* Pestañas de contenido del autor */}
           <div>

@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   AlertCircle,
+  Calendar,
+  CheckCircle2,
   Crown,
   Eye,
   EyeOff,
+  Flame,
   Gamepad2,
   Loader2,
+  Medal,
   Play,
   RefreshCw,
   Sparkles,
   Star,
+  Target,
   Trash2,
   Trophy,
   X,
@@ -21,6 +26,8 @@ import {
   deleteArcadeScore,
   deleteCustomArcadeChallenge,
   fetchArcadeLeaderboard,
+  fetchTodayBestScoreForGame,
+  fetchUserArcadeRecords,
   formatDifficultyLabel,
   getArcadeHighScores,
   loadArcadeGames,
@@ -29,7 +36,13 @@ import {
   type ArcadeEngineId,
   type ArcadeGameConfig,
   type ArcadeLeaderboardEntry,
+  type ArcadeLeaderboardPeriod,
 } from '../lib/arcade';
+import {
+  getDailyArcadeChallenge,
+  getLocalDailyChallengeBest,
+  getTodayStartIso,
+} from '../lib/phase3';
 import { ArcadeGameModal } from './ArcadeGameModal';
 import { Avatar } from './Avatar';
 import { OwnerBadge } from './OwnerBadge';
@@ -130,10 +143,21 @@ export function ArcadeSection() {
   );
   const [activeGame, setActiveGame] = useState<ArcadeGameConfig | null>(null);
 
-  // Top 10 Global (public.arcade_scores + profiles)
+  // Reto Diario y Récords Personales sincronizados con Supabase
+  const dailyChallenge = useMemo(() => getDailyArcadeChallenge(), []);
+  const [remoteRecords, setRemoteRecords] = useState<Record<string, number>>(
+    {}
+  );
+  const [dailyTodayBest, setDailyTodayBest] = useState<number>(() =>
+    getLocalDailyChallengeBest(dailyChallenge.dateKey, dailyChallenge.gameId)
+  );
+
+  // Top 10 Global (Esta semana, Este mes, Histórico)
   const [selectedBoardGameId, setSelectedBoardGameId] = useState<string>(
     () => loadArcadeGames()[0]?.id ?? 'senda-astral'
   );
+  const [boardPeriod, setBoardPeriod] =
+    useState<ArcadeLeaderboardPeriod>('week');
   const [leaderboard, setLeaderboard] = useState<ArcadeLeaderboardEntry[]>([]);
   const [isLoadingBoard, setIsLoadingBoard] = useState(true);
   const [boardError, setBoardError] = useState<string | null>(null);
@@ -152,19 +176,75 @@ export function ArcadeSection() {
 
   const refreshHighScores = useCallback(() => {
     setHighScores(getArcadeHighScores());
+    setDailyTodayBest((prev) =>
+      Math.max(
+        prev,
+        getLocalDailyChallengeBest(dailyChallenge.dateKey, dailyChallenge.gameId)
+      )
+    );
     setBoardRefreshKey((prev) => prev + 1);
-  }, []);
+  }, [dailyChallenge.dateKey, dailyChallenge.gameId]);
 
   useEffect(() => {
     setGames(loadArcadeGames());
     setHighScores(getArcadeHighScores());
   }, []);
 
+  // Sincroniza Mis Récords y el avance del Reto Diario desde Supabase
+  useEffect(() => {
+    const localDaily = getLocalDailyChallengeBest(
+      dailyChallenge.dateKey,
+      dailyChallenge.gameId
+    );
+    if (!user?.id) {
+      setRemoteRecords({});
+      setDailyTodayBest(localDaily);
+      return;
+    }
+
+    let active = true;
+    Promise.all([
+      fetchUserArcadeRecords(user.id).catch(() => ({})),
+      fetchTodayBestScoreForGame(
+        user.id,
+        dailyChallenge.gameId,
+        getTodayStartIso()
+      ).catch(() => 0),
+    ]).then(([recordsMap, todayRemoteBest]) => {
+      if (!active) return;
+      setRemoteRecords(recordsMap);
+      setDailyTodayBest(Math.max(localDaily, todayRemoteBest));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id, boardRefreshKey, dailyChallenge.dateKey, dailyChallenge.gameId]);
+
+  const mergedHighScores = useMemo(() => {
+    const combined: Record<string, number> = { ...highScores };
+    for (const [gameId, score] of Object.entries(remoteRecords)) {
+      combined[gameId] = Math.max(combined[gameId] ?? 0, score);
+    }
+    return combined;
+  }, [highScores, remoteRecords]);
+
   const visibleGames = isOwner ? games : games.filter((g) => !g.isHidden);
   const featuredGame = visibleGames.find((g) => g.isFeatured) ?? null;
   const catalogGames = featuredGame
     ? visibleGames.filter((g) => g.id !== featuredGame.id)
     : visibleGames;
+
+  const dailyChallengeGame =
+    visibleGames.find((g) => g.id === dailyChallenge.gameId) ??
+    games.find((g) => g.id === dailyChallenge.gameId) ??
+    visibleGames[0] ??
+    null;
+  const dailyProgressPct = Math.min(
+    100,
+    Math.round((dailyTodayBest / Math.max(1, dailyChallenge.targetScore)) * 100)
+  );
+  const isDailyCompleted = dailyTodayBest >= dailyChallenge.targetScore;
 
   useEffect(() => {
     if (
@@ -183,7 +263,11 @@ export function ArcadeSection() {
       setBoardError(null);
       setConfirmDeleteScoreId(null);
       try {
-        const entries = await fetchArcadeLeaderboard(selectedBoardGameId, 10);
+        const entries = await fetchArcadeLeaderboard(
+          selectedBoardGameId,
+          10,
+          boardPeriod
+        );
         if (active) {
           setLeaderboard(entries);
         }
@@ -205,14 +289,17 @@ export function ArcadeSection() {
     return () => {
       active = false;
     };
-  }, [selectedBoardGameId, boardRefreshKey]);
+  }, [selectedBoardGameId, boardPeriod, boardRefreshKey]);
 
-  async function handleDeleteScore(scoreId: string) {
+  async function handleDeleteScore(
+    scoreId: string,
+    source: 'arcade_scores' | 'arcade_score_logs'
+  ) {
     if (!isOwner || deletingScoreId) return;
     setDeletingScoreId(scoreId);
     setBoardError(null);
     try {
-      await deleteArcadeScore(scoreId);
+      await deleteArcadeScore(scoreId, source);
       setLeaderboard((prev) => prev.filter((item) => item.id !== scoreId));
       setConfirmDeleteScoreId(null);
     } catch (err) {
@@ -306,6 +393,175 @@ export function ArcadeSection() {
         )}
       </div>
 
+      {/* Reto del Día + Mis Récords personales */}
+      <div className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-12">
+        {/* Tarjeta destacada: Reto del Día */}
+        <div
+          aria-labelledby="daily-challenge-heading"
+          className={`flex flex-col justify-between rounded-2xl border bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300 lg:col-span-7 ${
+            isDailyCompleted
+              ? 'border-emerald-500/45'
+              : 'border-[var(--accent-border)]'
+          }`}
+        >
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 font-bold text-[var(--accent-primary)]">
+                  <Target size={14} aria-hidden="true" />
+                  <span>Reto del Día</span>
+                </span>
+                <span aria-hidden="true" className="text-[var(--text-muted)]">
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                  <Calendar size={12} aria-hidden="true" />
+                  <span>{dailyChallenge.dateLabel}</span>
+                </span>
+              </div>
+
+              {isDailyCompleted ? (
+                <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-300">
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                  <span>Completado hoy</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-300">
+                  <Flame size={13} aria-hidden="true" />
+                  <span>Activo hoy</span>
+                </span>
+              )}
+            </div>
+
+            <h2
+              id="daily-challenge-heading"
+              className="mt-2 font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
+            >
+              {dailyChallenge.title}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {dailyChallenge.description}
+            </p>
+
+            {/* Barra de progreso del reto diario */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs tabular-nums">
+                <span className="text-[var(--text-secondary)]">
+                  Mejor marca de hoy en{' '}
+                  <strong className="text-[var(--text-main)]">
+                    {dailyChallenge.gameTitle}
+                  </strong>
+                </span>
+                <span className="font-bold text-[var(--text-main)]">
+                  {dailyTodayBest.toLocaleString('es-ES')} /{' '}
+                  {dailyChallenge.targetScore.toLocaleString('es-ES')} pts (
+                  {dailyProgressPct}%)
+                </span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                <div
+                  style={{
+                    transform: `scaleX(${dailyProgressPct / 100})`,
+                    transformOrigin: 'left center',
+                  }}
+                  className={`h-full w-full rounded-full transition-transform duration-500 ease-out ${
+                    isDailyCompleted
+                      ? 'bg-emerald-500'
+                      : 'bg-[var(--accent-primary)]'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              {isDailyCompleted
+                ? '¡Objetivo cumplido! Mañana rotará automáticamente un nuevo reto.'
+                : 'Supera la meta hoy para desbloquear la medalla Reto Diario Superado.'}
+            </p>
+
+            {dailyChallengeGame && (
+              <button
+                type="button"
+                onClick={() => setActiveGame(dailyChallengeGame)}
+                className="min-h-[42px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-xs font-bold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all whitespace-nowrap"
+              >
+                <Play size={14} className="fill-current" aria-hidden="true" />
+                <span>
+                  {isDailyCompleted ? 'Volver a jugar' : 'Jugar reto'}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tarjeta personal: Mis Récords por juego */}
+        <div
+          aria-labelledby="my-arcade-records-heading"
+          className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300 lg:col-span-5"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/12 text-amber-600 dark:text-amber-300">
+                <Medal size={16} aria-hidden="true" />
+              </div>
+              <div>
+                <h2
+                  id="my-arcade-records-heading"
+                  className="font-display text-lg font-bold tracking-tight text-[var(--text-main)]"
+                >
+                  Mis Récords
+                </h2>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {user
+                    ? 'Sincronizados con tu cuenta'
+                    : 'Guardados en este dispositivo'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <ul className="mt-4 space-y-2">
+            {visibleGames.slice(0, 4).map((game) => {
+              const best = mergedHighScores[game.id] ?? 0;
+              return (
+                <li
+                  key={game.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-2.5 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-[var(--text-main)]">
+                      {game.title}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {formatDifficultyLabel(game.difficulty)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="font-display text-sm font-bold tabular-nums text-[var(--text-main)]">
+                      {best.toLocaleString('es-ES')}{' '}
+                      <span className="text-[10px] font-normal text-[var(--text-muted)]">
+                        pts
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveGame(game)}
+                      aria-label={`Jugar ${game.title}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--accent-primary)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)] transition-colors"
+                    >
+                      <Play size={12} className="fill-current" aria-hidden="true" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+
       {/* Juego destacado arriba */}
       {featuredGame && (
         <article className="mt-7 overflow-hidden rounded-2xl border border-amber-500/35 bg-[var(--bg-card)] shadow-sm transition-colors duration-300">
@@ -350,7 +606,7 @@ export function ArcadeSection() {
                     <span>
                       Récord:{' '}
                       <strong className="tabular-nums text-[var(--text-main)]">
-                        {(highScores[featuredGame.id] ?? 0).toLocaleString('es-ES')}
+                        {(mergedHighScores[featuredGame.id] ?? 0).toLocaleString('es-ES')}
                       </strong>
                     </span>
                   </span>
@@ -459,7 +715,7 @@ export function ArcadeSection() {
 
                     <span className="inline-flex items-center gap-1 text-[var(--text-main)] tabular-nums">
                       <Trophy size={13} className="text-amber-600 dark:text-amber-300" aria-hidden="true" />
-                      {(highScores[game.id] ?? 0).toLocaleString('es-ES')}
+                      {(mergedHighScores[game.id] ?? 0).toLocaleString('es-ES')}
                     </span>
                   </div>
 
@@ -567,34 +823,68 @@ export function ArcadeSection() {
           </button>
         </div>
 
-        {/* Filtro por minijuego */}
-        {visibleGames.length > 0 && (
+        {/* Filtro por periodo (Esta semana, Este mes, Histórico) y por minijuego */}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {visibleGames.length > 0 && (
+            <div
+              role="tablist"
+              aria-label="Filtrar Top 10 por juego"
+              className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {visibleGames.map((game) => {
+                const isSelected = selectedBoardGameId === game.id;
+                return (
+                  <button
+                    key={game.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setSelectedBoardGameId(game.id)}
+                    className={`min-h-[38px] shrink-0 rounded-xl border px-3.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                      isSelected
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                    }`}
+                  >
+                    {game.title}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div
             role="tablist"
-            aria-label="Filtrar Top 10 por juego"
-            className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="Filtrar clasificación por periodo"
+            className="inline-flex self-start sm:self-auto shrink-0 items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1"
           >
-            {visibleGames.map((game) => {
-              const isSelected = selectedBoardGameId === game.id;
+            {(
+              [
+                { id: 'week', label: 'Esta semana' },
+                { id: 'month', label: 'Este mes' },
+                { id: 'all', label: 'Histórico' },
+              ] as const
+            ).map((periodOpt) => {
+              const isSelected = boardPeriod === periodOpt.id;
               return (
                 <button
-                  key={game.id}
+                  key={periodOpt.id}
                   type="button"
                   role="tab"
                   aria-selected={isSelected}
-                  onClick={() => setSelectedBoardGameId(game.id)}
-                  className={`min-h-[40px] shrink-0 rounded-xl border px-3.5 text-xs font-semibold transition-colors ${
+                  onClick={() => setBoardPeriod(periodOpt.id)}
+                  className={`min-h-[34px] rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                     isSelected
-                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
-                      : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
+                      ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                   }`}
                 >
-                  {game.title}
+                  {periodOpt.label}
                 </button>
               );
             })}
           </div>
-        )}
+        </div>
 
         {boardError && (
           <div
@@ -617,7 +907,11 @@ export function ArcadeSection() {
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-8 text-center">
               <Trophy size={24} className="mx-auto text-[var(--text-muted)]" aria-hidden="true" />
               <p className="mt-2.5 text-sm font-medium text-[var(--text-main)]">
-                Aún no hay récords registrados en este minijuego
+                {boardPeriod === 'week'
+                  ? 'Aún no hay partidas registradas esta semana'
+                  : boardPeriod === 'month'
+                    ? 'Aún no hay partidas registradas este mes'
+                    : 'Aún no hay récords registrados en este minijuego'}
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 Inicia una partida con tu cuenta para reclamar el puesto #1.
@@ -699,7 +993,9 @@ export function ArcadeSection() {
                             <button
                               type="button"
                               disabled={isDeleting}
-                              onClick={() => void handleDeleteScore(entry.id)}
+                              onClick={() =>
+                                void handleDeleteScore(entry.id, entry.source)
+                              }
                               className="min-h-[34px] rounded-lg bg-red-600 px-2.5 text-[11px] font-semibold text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
                             >
                               {isDeleting ? 'Borrando…' : 'Confirmar'}

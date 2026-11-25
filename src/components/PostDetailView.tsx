@@ -20,10 +20,16 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
 import { summarizeArticleExecutive } from '../lib/ai';
 import { fetchUserReportedPostIds } from '../lib/phase2';
+import {
+  fetchPollForPost,
+  recordPostReadingHistory,
+  type PostPollData,
+} from '../lib/phase3';
 import {
   deletePost,
   estimateReadMinutes,
@@ -44,6 +50,7 @@ import { FollowButton } from './FollowButton';
 import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { PollCard } from './PollCard';
 import { ReportPostModal } from './ReportPostModal';
 import { VerifiedBadge } from './VerifiedBadge';
 
@@ -70,7 +77,9 @@ export function PostDetailView({
 }: PostDetailViewProps) {
   const { user, isAuthenticated, isOwner, canVerifyNews } = useAuth();
   const { isPostSaved, busySavePostIds, toggleSavePost } = useSocial();
+  const { checkReadingHistoryAchievement } = useAchievements();
   const [post, setPost] = useState<PostRecord>(initialPost);
+  const [poll, setPoll] = useState<PostPollData | null>(null);
   const [isTogglingLike, setIsTogglingLike] = useState(false);
   const [isTogglingPin, setIsTogglingPin] = useState(false);
   const [isTogglingVerified, setIsTogglingVerified] = useState(false);
@@ -87,6 +96,7 @@ export function PostDetailView({
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const viewedPostIdRef = useRef<string | null>(null);
+  const historyRecordedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPost(initialPost);
@@ -103,6 +113,38 @@ export function PostDetailView({
       views_count: (prev.views_count ?? 0) + 1,
     }));
   }, [initialPost.id]);
+
+  // Registra lectura automática en reading_history al abrir un artículo de Actualidad
+  useEffect(() => {
+    if (!user?.id || initialPost.mode !== 'actualidad' || !initialPost.id) return;
+    const key = `${user.id}:${initialPost.id}`;
+    if (historyRecordedKeyRef.current === key) return;
+    historyRecordedKeyRef.current = key;
+    void recordPostReadingHistory(user.id, initialPost.id)
+      .then(() => checkReadingHistoryAchievement())
+      .catch(() => {
+        // Ignora error auxiliar al registrar historial
+      });
+  }, [user?.id, initialPost.id, initialPost.mode, checkReadingHistoryAchievement]);
+
+  // Carga encuesta interactiva si la publicación pertenece a Comunidad
+  useEffect(() => {
+    if (initialPost.mode !== 'comunidad' || !initialPost.id) {
+      setPoll(null);
+      return;
+    }
+    let active = true;
+    fetchPollForPost(initialPost.id, user?.id)
+      .then((data) => {
+        if (active) setPoll(data);
+      })
+      .catch(() => {
+        if (active) setPoll(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialPost.id, initialPost.mode, user?.id]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -785,6 +827,14 @@ export function PostDetailView({
                 fallbackClassName="h-56 w-full"
               />
             </div>
+          )}
+
+          {poll && (
+            <PollCard
+              poll={poll}
+              onOpenAuth={onOpenAuth}
+              onPollUpdated={setPoll}
+            />
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">

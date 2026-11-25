@@ -17,11 +17,16 @@ import { PostDetailView } from './components/PostDetailView';
 import { ProfileSection } from './components/ProfileSection';
 import { PublicProfileView } from './components/PublicProfileView';
 import { SeriesDetailView } from './components/SeriesDetailView';
+import { AchievementProvider } from './context/AchievementContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocialProvider, useSocial } from './context/SocialContext';
 import { ThemeProvider } from './context/ThemeContext';
 import type { AiChatContext } from './lib/ai';
-import type { ChapterRecord, SeriesRecord } from './lib/library';
+import {
+  fetchChaptersBySeries,
+  type ChapterRecord,
+  type SeriesRecord,
+} from './lib/library';
 import {
   fetchPostById,
   getAuthorDisplayName,
@@ -218,6 +223,36 @@ function AppShell() {
     []
   );
 
+  const handleResumeChapterFromHistory = useCallback(
+    async (series: SeriesRecord, chapterId: string | null) => {
+      try {
+        const chapters = await fetchChaptersBySeries(series.id);
+        if (chapters.length === 0) {
+          setSelectedProfileId(null);
+          setSelectedSeries(series);
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          return;
+        }
+        const targetIndex = chapterId
+          ? chapters.findIndex((c) => c.id === chapterId)
+          : 0;
+        setSelectedProfileId(null);
+        setSelectedSeries(series);
+        setActiveReader({
+          series,
+          chapters,
+          chapterIndex: targetIndex >= 0 ? targetIndex : 0,
+        });
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      } catch {
+        setSelectedProfileId(null);
+        setSelectedSeries(series);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    },
+    []
+  );
+
   const handleSeriesCreated = useCallback((created: SeriesRecord) => {
     setBibliotecaFilter('todas');
     setBibliotecaSearch('');
@@ -337,6 +372,9 @@ function AppShell() {
             onSignedOut={() => handleSelectView('actualidad')}
             onOpenPost={handleSelectPost}
             onOpenSeries={handleSelectSeries}
+            onResumeChapter={(series, chapterId) =>
+              void handleResumeChapterFromHistory(series, chapterId)
+            }
             onPostDeleted={handlePostDeleted}
           />
         ) : activeView === 'actualidad' ? (
@@ -433,7 +471,9 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <SocialProvider>
-          <AppShell />
+          <AchievementProvider>
+            <AppShell />
+          </AchievementProvider>
         </SocialProvider>
       </ThemeProvider>
     </AuthProvider>

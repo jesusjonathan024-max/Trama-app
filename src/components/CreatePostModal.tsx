@@ -7,14 +7,22 @@ import {
 } from 'react';
 import {
   AlertCircle,
+  BarChart3,
   ImagePlus,
   Link2,
   Loader2,
+  Plus,
   Send,
   Trash2,
   X,
 } from 'lucide-react';
+import { useAchievements } from '../context/AchievementContext';
 import { useAuth } from '../context/AuthContext';
+import {
+  POLL_DURATION_OPTIONS,
+  createPostPoll,
+  type PollDurationOption,
+} from '../lib/phase3';
 import {
   ACTUALIDAD_CATEGORIES,
   ALLOWED_IMAGE_TYPES,
@@ -43,12 +51,17 @@ export function CreatePostModal({
   onCreated,
 }: CreatePostModalProps) {
   const { user } = useAuth();
+  const { unlockByKeys } = useAchievements();
   const [mode, setMode] = useState<PostMode>(defaultMode);
   const [category, setCategory] = useState<string>(ACTUALIDAD_CATEGORIES[0]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sourceName, setSourceName] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [includePoll, setIncludePoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollDuration, setPollDuration] = useState<PollDurationOption>('3d');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,8 +152,28 @@ export function CreatePostModal({
     setContent('');
     setSourceName('');
     setSourceUrl('');
+    setIncludePoll(false);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setPollDuration('3d');
     clearSelectedImage();
     setErrorMsg(null);
+  }
+
+  function handlePollOptionChange(index: number, value: string) {
+    setPollOptions((prev) =>
+      prev.map((item, idx) => (idx === index ? value : item))
+    );
+  }
+
+  function handleAddPollOption() {
+    if (pollOptions.length >= 4) return;
+    setPollOptions((prev) => [...prev, '']);
+  }
+
+  function handleRemovePollOption(index: number) {
+    if (pollOptions.length <= 2) return;
+    setPollOptions((prev) => prev.filter((_, idx) => idx !== index));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -181,6 +214,21 @@ export function CreatePostModal({
       return;
     }
 
+    const cleanedPollOptions = pollOptions
+      .map((opt) => opt.trim())
+      .filter((opt) => opt.length > 0);
+
+    if (mode === 'comunidad' && includePoll) {
+      if (!pollQuestion.trim()) {
+        setErrorMsg('Escribe la pregunta de tu encuesta antes de publicar.');
+        return;
+      }
+      if (cleanedPollOptions.length < 2) {
+        setErrorMsg('La encuesta debe tener al menos 2 opciones de respuesta.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -189,7 +237,7 @@ export function CreatePostModal({
         uploadedImageUrl = await uploadPostImage(selectedFile, user.id);
       }
 
-      await createPost({
+      const createdPostId = await createPost({
         authorId: user.id,
         mode,
         category,
@@ -199,6 +247,17 @@ export function CreatePostModal({
         sourceName: mode === 'actualidad' ? trimmedSourceName || null : null,
         sourceUrl: mode === 'actualidad' ? trimmedSourceUrl || null : null,
       });
+
+      if (mode === 'comunidad' && includePoll) {
+        await createPostPoll({
+          postId: createdPostId,
+          question: pollQuestion.trim(),
+          options: cleanedPollOptions,
+          duration: pollDuration,
+        });
+      }
+
+      void unlockByKeys(['first_post']);
 
       const publishedMode = mode;
       resetForm();
@@ -444,6 +503,133 @@ export function CreatePostModal({
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Encuesta interactiva opcional (solo en Comunidad) */}
+          {mode === 'comunidad' && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 space-y-3.5 transition-colors duration-300">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-main)]">
+                  <BarChart3
+                    size={15}
+                    className="text-[var(--accent-primary)]"
+                    aria-hidden="true"
+                  />
+                  <span>Agregar encuesta</span>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includePoll}
+                  onClick={() => setIncludePoll((prev) => !prev)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                    includePoll
+                      ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-card)]'
+                  }`}
+                >
+                  <span className="sr-only">Activar encuesta</span>
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                      includePoll ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {includePoll && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label
+                      htmlFor="poll-question-input"
+                      className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
+                    >
+                      Pregunta de la encuesta
+                    </label>
+                    <input
+                      id="poll-question-input"
+                      type="text"
+                      maxLength={180}
+                      value={pollQuestion}
+                      onChange={(e) => setPollQuestion(e.target.value)}
+                      placeholder="Ej. ¿Qué arco del manga te gustó más?"
+                      className="min-h-[42px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-[var(--text-secondary)]">
+                        Opciones (2 a 4)
+                      </span>
+                      {pollOptions.length < 4 && (
+                        <button
+                          type="button"
+                          onClick={handleAddPollOption}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-soft)] transition-colors"
+                        >
+                          <Plus size={13} aria-hidden="true" />
+                          <span>Agregar opción</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {pollOptions.map((optionValue, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          maxLength={90}
+                          value={optionValue}
+                          onChange={(e) =>
+                            handlePollOptionChange(idx, e.target.value)
+                          }
+                          placeholder={`Opción ${idx + 1}`}
+                          aria-label={`Opción ${idx + 1} de la encuesta`}
+                          className="min-h-[40px] flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                        />
+                        {pollOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePollOption(idx)}
+                            aria-label={`Quitar opción ${idx + 1}`}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-red-500/35 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+                      Duración de la encuesta
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      {POLL_DURATION_OPTIONS.map((opt) => {
+                        const active = pollDuration === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setPollDuration(opt.value)}
+                            className={`min-h-[38px] rounded-xl border px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                              active
+                                ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                                : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

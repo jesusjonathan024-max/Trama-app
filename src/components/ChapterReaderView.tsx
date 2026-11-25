@@ -7,6 +7,8 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
+import { useAchievements } from '../context/AchievementContext';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   formatChapterNumber,
@@ -18,6 +20,7 @@ import {
   type NovelReaderTheme,
   type SeriesRecord,
 } from '../lib/library';
+import { recordChapterReadingHistory } from '../lib/phase3';
 import { isSafeHttpUrl } from '../lib/supabase';
 import { CommentSection } from './CommentSection';
 
@@ -130,6 +133,8 @@ export function ChapterReaderView({
   onBackToSeries,
   onOpenAuth,
 }: ChapterReaderViewProps) {
+  const { user } = useAuth();
+  const { checkReadingHistoryAchievement } = useAchievements();
   const { themeMode, fontSizePx } = useTheme();
   const currentChapter = chapters[chapterIndex];
   const prevChapter = chapterIndex > 0 ? chapters[chapterIndex - 1] : null;
@@ -166,6 +171,16 @@ export function ChapterReaderView({
     );
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [series.id, currentChapter]);
+
+  // Registra automáticamente el capítulo leído en reading_history de Supabase
+  useEffect(() => {
+    if (!user?.id || !currentChapter?.id) return;
+    void recordChapterReadingHistory(user.id, series.id, currentChapter.id)
+      .then(() => checkReadingHistoryAchievement())
+      .catch(() => {
+        // Ignora fallo auxiliar al registrar historial
+      });
+  }, [user?.id, series.id, currentChapter?.id, checkReadingHistoryAchievement]);
 
   function updateFontSize(delta: number) {
     setNovelPrefs((prev) => {

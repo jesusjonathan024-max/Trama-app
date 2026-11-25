@@ -27,6 +27,7 @@ import {
   postHasHashtag,
 } from '../lib/hashtags';
 import { fetchUserReportedPostIds } from '../lib/phase2';
+import { fetchPollsByPostIds, type PostPollData } from '../lib/phase3';
 import {
   COMUNIDAD_CATEGORIES,
   deletePost,
@@ -46,6 +47,7 @@ import { FollowButton } from './FollowButton';
 import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { PollCard } from './PollCard';
 import { ReportPostModal } from './ReportPostModal';
 
 interface ComunidadFeedProps {
@@ -96,6 +98,9 @@ export function ComunidadFeed({
     () => new Set()
   );
   const [reportingPost, setReportingPost] = useState<PostRecord | null>(null);
+  const [pollsByPostId, setPollsByPostId] = useState<
+    Record<string, PostPollData>
+  >({});
 
   const loadThreads = useCallback(async () => {
     setIsLoading(true);
@@ -103,6 +108,18 @@ export function ComunidadFeed({
     try {
       const data = await fetchPostsByMode('comunidad', user?.id);
       setPosts(data);
+      if (data.length > 0) {
+        fetchPollsByPostIds(
+          data.map((p) => p.id),
+          user?.id
+        )
+          .then((map) => setPollsByPostId(map))
+          .catch(() => {
+            // Ignora fallo auxiliar al cargar encuestas
+          });
+      } else {
+        setPollsByPostId({});
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error
@@ -690,6 +707,19 @@ export function ComunidadFeed({
                         fallbackClassName="h-48 w-full"
                       />
                     </button>
+                  )}
+
+                  {pollsByPostId[thread.id] && (
+                    <PollCard
+                      poll={pollsByPostId[thread.id]}
+                      onOpenAuth={onOpenAuth}
+                      onPollUpdated={(updatedPoll) =>
+                        setPollsByPostId((prev) => ({
+                          ...prev,
+                          [thread.id]: updatedPoll,
+                        }))
+                      }
+                    />
                   )}
                 </div>
 
