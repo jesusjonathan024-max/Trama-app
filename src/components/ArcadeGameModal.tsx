@@ -32,7 +32,7 @@ interface HudSnapshot {
   maxLives: number;
   wave: number;
   combo: number;
-  charge: number; // 0..100 (Impulso or Nova)
+  charge: number;
   powerupLabel: string | null;
 }
 
@@ -59,7 +59,8 @@ interface FloatingText {
 interface Star {
   x: number;
   y: number;
-  speed: number;
+  vx: number;
+  vy: number;
   size: number;
   alpha: number;
 }
@@ -77,15 +78,18 @@ interface AstralHazard {
 interface AstralRelic {
   x: number;
   y: number;
+  vx: number;
   vy: number;
   radius: number;
   kind: 'rune' | 'shield';
   pulse: number;
+  life: number;
 }
 
 interface VoidBeam {
-  x: number;
-  width: number;
+  axis: 'vertical' | 'horizontal';
+  pos: number;
+  thickness: number;
   timer: number; // > 0 warning, <= 0 active until -0.45
   hitDone: boolean;
 }
@@ -98,24 +102,35 @@ interface BastionBullet {
   color: string;
 }
 
+interface EnemyOrb {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+}
+
 interface BastionEnemy {
   x: number;
   y: number;
-  baseX: number;
+  vx: number;
   vy: number;
+  speed: number;
   radius: number;
   hp: number;
   maxHp: number;
   kind: 'wraith' | 'hunter' | 'golem';
   phase: number;
   flash: number;
+  shootCooldown: number;
 }
 
 interface BastionDrop {
   x: number;
   y: number;
-  vy: number;
   kind: 'triple' | 'rapid' | 'heal';
+  life: number;
+  pulse: number;
 }
 
 interface ShockwaveRing {
@@ -187,7 +202,7 @@ class RetroSynth {
   }
 
   public shoot() {
-    this.tone(620, 0.045, 'square', 0.03, 320);
+    this.tone(620, 0.045, 'square', 0.028, 320);
   }
 
   public hitEnemy(isBoss = false) {
@@ -274,6 +289,14 @@ function GameEmblemSvg({ game }: { game: ArcadeGameConfig }) {
   );
 }
 
+function randomEdgeSpawn(width: number, height: number, margin: number) {
+  const edge = Math.floor(Math.random() * 4);
+  if (edge === 0) return { x: Math.random() * width, y: -margin }; // Top
+  if (edge === 1) return { x: width + margin, y: Math.random() * height }; // Right
+  if (edge === 2) return { x: Math.random() * width, y: height + margin }; // Bottom
+  return { x: -margin, y: Math.random() * height }; // Left
+}
+
 export function ArcadeGameModal({
   game,
   onClose,
@@ -298,11 +321,35 @@ export function ArcadeGameModal({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const phaseRef = useRef<GamePhase>('TITLE_MENU');
   const synthRef = useRef<RetroSynth>(new RetroSynth());
-  const keysRef = useRef<{ left: boolean; right: boolean }>({
+
+  // Entrada de teclado en 8 direcciones (X y Y)
+  const keysRef = useRef<{
+    up: boolean;
+    down: boolean;
+    left: boolean;
+    right: boolean;
+  }>({
+    up: false,
+    down: false,
     left: false,
     right: false,
   });
-  const pointerTargetXRef = useRef<number | null>(null);
+
+  // Desplazamiento relativo táctil / puntero (para que el dedo nunca tape al personaje)
+  const pointerStateRef = useRef<{
+    activeId: number | null;
+    lastX: number;
+    lastY: number;
+    pendingDx: number;
+    pendingDy: number;
+  }>({
+    activeId: null,
+    lastX: 0,
+    lastY: 0,
+    pendingDx: 0,
+    pendingDy: 0,
+  });
+
   const abilityQueuedRef = useRef<boolean>(false);
 
   phaseRef.current = phase;
@@ -320,13 +367,15 @@ export function ArcadeGameModal({
       maxLives: 3,
       wave: 1,
       combo: 1,
-      charge: game.engine === 'astral' ? 100 : 35,
+      charge: game.engine === 'astral' ? 100 : 40,
       powerupLabel: null,
     });
   }, [game]);
 
   const startNewRun = useCallback(() => {
     if (!game) return;
+    pointerStateRef.current.pendingDx = 0;
+    pointerStateRef.current.pendingDy = 0;
     setIsNewRecord(false);
     setPhase('PLAYING');
     setRunKey((prev) => prev + 1);
@@ -339,7 +388,7 @@ export function ArcadeGameModal({
     }
   }, []);
 
-  // Controles de teclado
+  // Controles de teclado omnidireccionales (WASD + Flechas + Espacio)
   useEffect(() => {
     if (!game) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -360,21 +409,20 @@ export function ArcadeGameModal({
         return;
       }
 
-      if (
-        event.key === 'ArrowLeft' ||
-        event.key === 'a' ||
-        event.key === 'A'
-      ) {
+      const key = event.key;
+      if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+        if (phaseRef.current === 'PLAYING') event.preventDefault();
+        keysRef.current.up = true;
+      } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+        if (phaseRef.current === 'PLAYING') event.preventDefault();
+        keysRef.current.down = true;
+      } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+        if (phaseRef.current === 'PLAYING') event.preventDefault();
         keysRef.current.left = true;
-        pointerTargetXRef.current = null;
-      } else if (
-        event.key === 'ArrowRight' ||
-        event.key === 'd' ||
-        event.key === 'D'
-      ) {
+      } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+        if (phaseRef.current === 'PLAYING') event.preventDefault();
         keysRef.current.right = true;
-        pointerTargetXRef.current = null;
-      } else if (event.key === ' ' || event.key === 'Shift') {
+      } else if (key === ' ' || key === 'Shift') {
         if (phaseRef.current === 'PLAYING') {
           event.preventDefault();
           abilityQueuedRef.current = true;
@@ -389,31 +437,37 @@ export function ArcadeGameModal({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (
-        event.key === 'ArrowLeft' ||
-        event.key === 'a' ||
-        event.key === 'A'
-      ) {
+      const key = event.key;
+      if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+        keysRef.current.up = false;
+      } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+        keysRef.current.down = false;
+      } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
         keysRef.current.left = false;
-      } else if (
-        event.key === 'ArrowRight' ||
-        event.key === 'd' ||
-        event.key === 'D'
-      ) {
+      } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
         keysRef.current.right = false;
       }
     };
 
+    const handleBlur = () => {
+      keysRef.current = { up: false, down: false, left: false, right: false };
+      pointerStateRef.current.activeId = null;
+      pointerStateRef.current.pendingDx = 0;
+      pointerStateRef.current.pendingDy = 0;
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      keysRef.current = { left: false, right: false };
+      window.removeEventListener('blur', handleBlur);
+      keysRef.current = { up: false, down: false, left: false, right: false };
     };
   }, [game, onClose, startNewRun]);
 
-  // Motor principal HTML5 Canvas (60fps, dt clamped, aislado de React)
+  // Motor principal HTML5 Canvas 2D con movimiento libre omnidireccional (60fps, dt clamped)
   useEffect(() => {
     if (!game || runKey === 0) return;
     const canvas = canvasRef.current;
@@ -442,19 +496,20 @@ export function ArcadeGameModal({
     const { palette, speedMultiplier, spawnMultiplier, engine } = game;
     const synth = synthRef.current;
 
-    const stars: Star[] = Array.from({ length: 54 }, () => ({
+    const stars: Star[] = Array.from({ length: 58 }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      speed: 24 + Math.random() * 95,
+      vx: (Math.random() - 0.5) * 14,
+      vy: 14 + Math.random() * 48,
       size: 1 + Math.random() * 2,
-      alpha: 0.25 + Math.random() * 0.65,
+      alpha: 0.22 + Math.random() * 0.65,
     }));
 
     const particles: Particle[] = [];
     const floatingTexts: FloatingText[] = [];
     const shockwaves: ShockwaveRing[] = [];
 
-    // Estado general de partida
+    // Estado general
     let elapsed = 0;
     let score = 0;
     let lives = 3;
@@ -462,32 +517,38 @@ export function ArcadeGameModal({
     let wave = 1;
     let combo = 1;
     let comboTimer = 0;
-    let charge = engine === 'astral' ? 100 : 40;
+    let charge = engine === 'astral' ? 100 : 45;
     let invulnTimer = 0;
     let dashTimer = 0;
+    let dashDirX = 0;
+    let dashDirY = -1;
     let hitstopTimer = 0;
     let shakeMag = 0;
-    let gridOffset = 0;
-    let bannerText = `OLEADA 1`;
-    let bannerTimer = 1.6;
+    let gridOffsetX = 0;
+    let gridOffsetY = 0;
+    let bannerText = 'OLEADA 1';
+    let bannerTimer = 1.5;
 
-    // Jugador
+    // Jugador libre en 2D (X, Y)
     let playerX = width / 2;
-    const playerY = () => height - (engine === 'bastion' ? 74 : 92);
-    const playerRadius = 17;
+    let playerY = height * 0.58;
+    let facingAngle = -Math.PI / 2; // Apunta arriba inicialmente
+    const playerRadius = 16;
+    const edgePadding = playerRadius + 10;
     const trail: Array<{ x: number; y: number; alpha: number }> = [];
 
-    // Colecciones específicas de Senda Astral
+    // Entidades de Senda Astral (Arena 360°)
     const hazards: AstralHazard[] = [];
     const relics: AstralRelic[] = [];
     const beams: VoidBeam[] = [];
-    let hazardSpawnTimer = 0.6;
-    let relicSpawnTimer = 0.9;
-    let beamSpawnTimer = 6.5;
+    let hazardSpawnTimer = 0.55;
+    let relicSpawnTimer = 0.6;
+    let beamSpawnTimer = 6.2;
 
-    // Colecciones específicas de Bastión de Runas
+    // Entidades de Bastión de Runas (Arena 360°)
     const bullets: BastionBullet[] = [];
     const enemies: BastionEnemy[] = [];
+    const enemyOrbs: EnemyOrb[] = [];
     const drops: BastionDrop[] = [];
     let fireCooldown = 0;
     let enemySpawnTimer = 0.7;
@@ -526,7 +587,7 @@ export function ArcadeGameModal({
       y: number,
       color: string,
       count: number,
-      speed = 180
+      speed = 185
     ) => {
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
@@ -559,7 +620,7 @@ export function ArcadeGameModal({
       if (invulnTimer > 0 || dashTimer > 0) return;
       lives = Math.max(0, lives - 1);
       combo = 1;
-      invulnTimer = 1.35;
+      invulnTimer = 1.4;
       hitstopTimer = 0.045;
       shakeMag = 12;
       synth.damage();
@@ -600,7 +661,6 @@ export function ArcadeGameModal({
       }
 
       elapsed += dt;
-      gridOffset = (gridOffset + dt * 90 * speedMultiplier) % 44;
       shakeMag = Math.max(0, shakeMag - dt * 28);
       invulnTimer = Math.max(0, invulnTimer - dt);
       dashTimer = Math.max(0, dashTimer - dt);
@@ -616,41 +676,92 @@ export function ArcadeGameModal({
         synth.pickup(wave + 2);
       }
 
-      const difficultyRamp = (1 + (wave - 1) * 0.12) * speedMultiplier;
-      const py = playerY();
+      const difficultyRamp = (1 + (wave - 1) * 0.11) * speedMultiplier;
 
-      // Movimiento del jugador (teclado o arrastre táctil)
-      const moveSpeed = (engine === 'astral' ? 390 : 370) * (dashTimer > 0 ? 1.45 : 1);
-      if (keysRef.current.left) {
-        playerX -= moveSpeed * dt;
-      }
-      if (keysRef.current.right) {
-        playerX += moveSpeed * dt;
-      }
-      if (pointerTargetXRef.current !== null) {
-        const diff = pointerTargetXRef.current - playerX;
-        const maxStep = moveSpeed * 1.65 * dt;
-        playerX += Math.abs(diff) <= maxStep ? diff : Math.sign(diff) * maxStep;
-      }
-      playerX = Math.min(width - 28, Math.max(28, playerX));
+      // =====================================================
+      // MOVIMIENTO OMNIDIRECCIONAL 2D (8 DIRECCIONES + TÁCTIL)
+      // =====================================================
+      const prevPlayerX = playerX;
+      const prevPlayerY = playerY;
 
-      // Rastro del jugador
-      if (dashTimer > 0 || Math.random() < 0.45) {
-        trail.push({ x: playerX, y: py, alpha: dashTimer > 0 ? 0.8 : 0.35 });
-      }
-      for (let i = trail.length - 1; i >= 0; i--) {
-        trail[i].alpha -= dt * 2.8;
-        trail[i].y += dt * 70;
-        if (trail[i].alpha <= 0) trail.splice(i, 1);
+      let inputX = 0;
+      let inputY = 0;
+      if (keysRef.current.left) inputX -= 1;
+      if (keysRef.current.right) inputX += 1;
+      if (keysRef.current.up) inputY -= 1;
+      if (keysRef.current.down) inputY += 1;
+
+      const baseMoveSpeed = engine === 'astral' ? 335 : 310;
+      const effectiveSpeed = baseMoveSpeed * (dashTimer > 0 ? 1.55 : 1);
+
+      if (inputX !== 0 || inputY !== 0) {
+        // Normalización del vector de velocidad para diagonales uniformes
+        const length = Math.hypot(inputX, inputY);
+        const nx = inputX / length;
+        const ny = inputY / length;
+        playerX += nx * effectiveSpeed * dt;
+        playerY += ny * effectiveSpeed * dt;
+        dashDirX = nx;
+        dashDirY = ny;
+        facingAngle = Math.atan2(ny, nx);
+      } else if (dashTimer > 0 && engine === 'astral') {
+        // Impulso continuo en la última dirección al activar Dash sin tecla presionada
+        playerX += dashDirX * baseMoveSpeed * 0.85 * dt;
+        playerY += dashDirY * baseMoveSpeed * 0.85 * dt;
       }
 
-      // Estrellas parallax
+      // Desplazamiento relativo por arrastre táctil/puntero
+      const pState = pointerStateRef.current;
+      if (pState.pendingDx !== 0 || pState.pendingDy !== 0) {
+        const touchSensitivity = 1.18;
+        const moveDx = pState.pendingDx * touchSensitivity;
+        const moveDy = pState.pendingDy * touchSensitivity;
+        playerX += moveDx;
+        playerY += moveDy;
+        const dragMag = Math.hypot(moveDx, moveDy);
+        if (dragMag > 1.2) {
+          dashDirX = moveDx / dragMag;
+          dashDirY = moveDy / dragMag;
+          facingAngle = Math.atan2(moveDy, moveDx);
+        }
+        pState.pendingDx = 0;
+        pState.pendingDy = 0;
+      }
+
+      // Colisiones suaves con los 4 bordes del Canvas
+      playerX = Math.min(width - edgePadding, Math.max(edgePadding, playerX));
+      playerY = Math.min(height - edgePadding, Math.max(edgePadding, playerY));
+
+      const movedDist = Math.hypot(playerX - prevPlayerX, playerY - prevPlayerY);
+
+      // Parallax sutil de la rejilla y estrellas respondiendo al movimiento 2D
+      gridOffsetX = (gridOffsetX - (playerX - prevPlayerX) * 0.16 + 44) % 44;
+      gridOffsetY =
+        (gridOffsetY + dt * 36 * speedMultiplier - (playerY - prevPlayerY) * 0.16 + 44) %
+        44;
+
       for (const star of stars) {
-        star.y += star.speed * dt * (engine === 'astral' ? 1.35 : 0.85);
-        if (star.y > height) {
+        star.x += star.vx * dt;
+        star.y += star.vy * dt;
+        if (star.y > height + 4) {
           star.y = -4;
           star.x = Math.random() * width;
         }
+        if (star.x < -4) star.x = width + 4;
+        if (star.x > width + 4) star.x = -4;
+      }
+
+      // Rastro del jugador
+      if (dashTimer > 0 || movedDist > 1.5) {
+        trail.push({
+          x: playerX,
+          y: playerY,
+          alpha: dashTimer > 0 ? 0.85 : 0.38,
+        });
+      }
+      for (let i = trail.length - 1; i >= 0; i--) {
+        trail[i].alpha -= dt * 3.1;
+        if (trail[i].alpha <= 0) trail.splice(i, 1);
       }
 
       // Habilidad especial (Impulso en Astral / Pulso Nova en Bastión)
@@ -663,14 +774,14 @@ export function ArcadeGameModal({
           synth.ability();
           shockwaves.push({
             x: playerX,
-            y: py,
+            y: playerY,
             radius: 10,
             maxRadius: 115,
             color: palette.primary,
             life: 0.35,
             maxLife: 0.35,
           });
-          spawnFloat(playerX, py - 26, 'IMPULSO!', palette.primary);
+          spawnFloat(playerX, playerY - 26, 'IMPULSO!', palette.primary);
         } else if (engine === 'bastion' && charge >= 100) {
           charge = 0;
           hitstopTimer = 0.04;
@@ -678,21 +789,26 @@ export function ArcadeGameModal({
           synth.ability();
           shockwaves.push({
             x: playerX,
-            y: py,
-            radius: 20,
-            maxRadius: Math.max(width, height) * 0.9,
+            y: playerY,
+            radius: 18,
+            maxRadius: Math.max(width, height) * 0.85,
             color: palette.accent,
             life: 0.5,
             maxLife: 0.5,
           });
-          spawnFloat(playerX, py - 32, 'PULSO NOVA!', palette.accent);
+          spawnFloat(playerX, playerY - 30, 'PULSO NOVA!', palette.accent);
 
+          // Limpiar orbes enemigos cercanos y dañar a todos los enemigos
+          for (let i = enemyOrbs.length - 1; i >= 0; i--) {
+            spawnBurst(enemyOrbs[i].x, enemyOrbs[i].y, palette.accent, 5, 110);
+            enemyOrbs.splice(i, 1);
+          }
           for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             enemy.hp -= 5;
             enemy.flash = 0.16;
             if (enemy.hp <= 0) {
-              const pts = enemy.kind === 'golem' ? 220 : 80;
+              const pts = enemy.kind === 'golem' ? 220 : 85;
               score += pts;
               spawnBurst(enemy.x, enemy.y, palette.accent, 14, 210);
               spawnFloat(enemy.x, enemy.y, `+${pts}`, palette.accent);
@@ -702,57 +818,90 @@ export function ArcadeGameModal({
         }
       }
 
-      // =========================
-      // MOTOR 1: SENDA ASTRAL
-      // =========================
+      // =====================================================
+      // MOTOR 1: SENDA ASTRAL (ARENA LIBRE 360°)
+      // =====================================================
       if (engine === 'astral') {
-        score += dt * 14 * combo;
-        charge = Math.min(100, charge + dt * 9);
+        score += dt * 15 * combo;
+        charge = Math.min(100, charge + dt * 9.5);
         if (combo > 1) {
           comboTimer -= dt;
           if (comboTimer <= 0) combo = 1;
         }
 
+        // Meteoros desde los 4 bordes apuntando hacia zonas internas de la arena
         hazardSpawnTimer -= dt;
         if (hazardSpawnTimer <= 0) {
           const interval = Math.max(
-            0.22,
-            (0.66 - wave * 0.045) / spawnMultiplier
+            0.24,
+            (0.72 - wave * 0.045) / spawnMultiplier
           );
           hazardSpawnTimer = interval * (0.75 + Math.random() * 0.5);
-          const radius = 13 + Math.random() * 14;
+          const radius = 12 + Math.random() * 14;
+          const spawn = randomEdgeSpawn(width, height, radius + 14);
+          // Apunta a un punto interior cercano al centro o ligeramente hacia el jugador
+          const targetX =
+            Math.random() < 0.45
+              ? playerX + (Math.random() - 0.5) * 140
+              : width * (0.18 + Math.random() * 0.64);
+          const targetY =
+            Math.random() < 0.45
+              ? playerY + (Math.random() - 0.5) * 140
+              : height * (0.18 + Math.random() * 0.64);
+          const angle = Math.atan2(targetY - spawn.y, targetX - spawn.x);
+          const speed = (155 + Math.random() * 115) * difficultyRamp;
           hazards.push({
-            x: 24 + Math.random() * (width - 48),
-            y: -radius - 10,
-            vx: (Math.random() - 0.5) * 65 * difficultyRamp,
-            vy: (185 + Math.random() * 125) * difficultyRamp,
+            x: spawn.x,
+            y: spawn.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
             radius,
             rot: Math.random() * Math.PI * 2,
             rotSpeed: (Math.random() - 0.5) * 4.2,
           });
         }
 
+        // Reliquias y escudos distribuidos por todo el escenario con deriva suave
         relicSpawnTimer -= dt;
-        if (relicSpawnTimer <= 0) {
-          relicSpawnTimer = 1.05 + Math.random() * 0.7;
-          const spawnShield = lives < maxLives && Math.random() < 0.15;
+        if (relicSpawnTimer <= 0 && relics.length < 5) {
+          relicSpawnTimer = 1.25 + Math.random() * 0.7;
+          const spawnShield = lives < maxLives && Math.random() < 0.16;
+          // Evita aparecer pegado encima del jugador
+          let rx = 44 + Math.random() * (width - 88);
+          let ry = 48 + Math.random() * (height - 96);
+          if (Math.hypot(rx - playerX, ry - playerY) < 90) {
+            rx = playerX < width / 2 ? width - 64 : 64;
+            ry = playerY < height / 2 ? height - 72 : 72;
+          }
+          const driftAngle = Math.random() * Math.PI * 2;
+          const driftSpeed = 18 + Math.random() * 24;
           relics.push({
-            x: 34 + Math.random() * (width - 68),
-            y: -20,
-            vy: (150 + wave * 12) * speedMultiplier,
+            x: rx,
+            y: ry,
+            vx: Math.cos(driftAngle) * driftSpeed,
+            vy: Math.sin(driftAngle) * driftSpeed,
             radius: 13,
             kind: spawnShield ? 'shield' : 'rune',
             pulse: 0,
+            life: 9.5,
           });
         }
 
+        // Rayos del vacío verticales Y horizontales desde oleada 2
         beamSpawnTimer -= dt;
         if (beamSpawnTimer <= 0 && wave >= 2) {
-          beamSpawnTimer = Math.max(3.4, 7.2 - wave * 0.45);
+          beamSpawnTimer = Math.max(3.2, 6.8 - wave * 0.42);
+          const axis: 'vertical' | 'horizontal' =
+            Math.random() < 0.5 ? 'vertical' : 'horizontal';
+          const pos =
+            axis === 'vertical'
+              ? 46 + Math.random() * (width - 92)
+              : 54 + Math.random() * (height - 108);
           beams.push({
-            x: 44 + Math.random() * (width - 88),
-            width: 34,
-            timer: 1.15,
+            axis,
+            pos,
+            thickness: 32,
+            timer: 1.2,
             hitDone: false,
           });
         }
@@ -763,15 +912,11 @@ export function ArcadeGameModal({
           h.x += h.vx * dt;
           h.y += h.vy * dt;
           h.rot += h.rotSpeed * dt;
-          if (h.x < h.radius || h.x > width - h.radius) {
-            h.vx *= -1;
-          }
 
-          const dist = Math.hypot(h.x - playerX, h.y - py);
+          const dist = Math.hypot(h.x - playerX, h.y - playerY);
           if (dist < h.radius + playerRadius - 3) {
             if (dashTimer > 0) {
-              // El impulso destruye meteoros con bono
-              const pts = 60 * combo;
+              const pts = 65 * combo;
               score += pts;
               hitstopTimer = 0.025;
               shakeMag = 5;
@@ -782,27 +927,33 @@ export function ArcadeGameModal({
               continue;
             } else {
               hazards.splice(i, 1);
-              triggerPlayerDamage(playerX, py);
+              triggerPlayerDamage(playerX, playerY);
               continue;
             }
           }
 
-          if (h.y > height + 40) {
+          if (
+            h.x < -70 ||
+            h.x > width + 70 ||
+            h.y < -70 ||
+            h.y > height + 70
+          ) {
             hazards.splice(i, 1);
           }
         }
 
-        // Actualizar rayos del vacío
+        // Actualizar rayos del vacío (vertical y horizontal)
         for (let i = beams.length - 1; i >= 0; i--) {
           const b = beams[i];
           b.timer -= dt;
-          if (b.timer <= 0 && b.timer > -0.42) {
-            if (
-              !b.hitDone &&
-              Math.abs(playerX - b.x) < b.width / 2 + playerRadius - 4
-            ) {
+          if (b.timer <= 0 && b.timer > -0.42 && !b.hitDone) {
+            const distToBeam =
+              b.axis === 'vertical'
+                ? Math.abs(playerX - b.pos)
+                : Math.abs(playerY - b.pos);
+            if (distToBeam < b.thickness / 2 + playerRadius - 4) {
               b.hitDone = true;
-              triggerPlayerDamage(playerX, py);
+              triggerPlayerDamage(playerX, playerY);
             }
           }
           if (b.timer <= -0.45) {
@@ -810,13 +961,20 @@ export function ArcadeGameModal({
           }
         }
 
-        // Actualizar reliquias
+        // Actualizar reliquias 2D
         for (let i = relics.length - 1; i >= 0; i--) {
           const r = relics[i];
+          r.x += r.vx * dt;
           r.y += r.vy * dt;
           r.pulse += dt * 6;
-          const dist = Math.hypot(r.x - playerX, r.y - py);
-          if (dist < r.radius + playerRadius + 4) {
+          r.life -= dt;
+
+          // Rebote suave dentro del escenario
+          if (r.x < 30 || r.x > width - 30) r.vx *= -1;
+          if (r.y < 36 || r.y > height - 36) r.vy *= -1;
+
+          const dist = Math.hypot(r.x - playerX, r.y - playerY);
+          if (dist < r.radius + playerRadius + 5) {
             if (r.kind === 'shield') {
               lives = Math.min(maxLives, lives + 1);
               synth.ability();
@@ -824,10 +982,10 @@ export function ArcadeGameModal({
               spawnFloat(r.x, r.y, '+1 ESCUDO', '#34D399');
             } else {
               combo = Math.min(5, combo + 1);
-              comboTimer = 4.2;
-              const pts = 50 * combo;
+              comboTimer = 4.5;
+              const pts = 55 * combo;
               score += pts;
-              charge = Math.min(100, charge + 22);
+              charge = Math.min(100, charge + 24);
               synth.pickup(combo);
               spawnBurst(r.x, r.y, palette.accent, 10, 150);
               spawnFloat(
@@ -840,55 +998,70 @@ export function ArcadeGameModal({
             relics.splice(i, 1);
             continue;
           }
-          if (r.y > height + 30) {
+
+          if (r.life <= 0) {
             relics.splice(i, 1);
           }
         }
       }
 
-      // =========================
-      // MOTOR 2: BASTIÓN DE RUNAS
-      // =========================
+      // =====================================================
+      // MOTOR 2: BASTIÓN DE RUNAS (ARENA 360° + AUTO-AIM)
+      // =====================================================
       if (engine === 'bastion') {
+        // Encontrar al enemigo más cercano para apuntar disparos en 360°
+        let nearestEnemy: BastionEnemy | null = null;
+        let nearestDist = Infinity;
+        for (const e of enemies) {
+          const d = Math.hypot(e.x - playerX, e.y - playerY);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestEnemy = e;
+          }
+        }
+
+        const aimAngle = nearestEnemy
+          ? Math.atan2(nearestEnemy.y - playerY, nearestEnemy.x - playerX)
+          : facingAngle;
+
+        if (nearestEnemy) {
+          facingAngle = aimAngle;
+        }
+
         fireCooldown -= dt;
-        const rate = rapidTimer > 0 ? 0.11 : 0.21;
-        if (fireCooldown <= 0) {
+        const rate = rapidTimer > 0 ? 0.12 : 0.22;
+        if (fireCooldown <= 0 && (nearestEnemy || movedDist > 0.2 || elapsed > 0.2)) {
           fireCooldown = rate;
           synth.shoot();
+          const bulletSpeed = 540;
           if (tripleTimer > 0) {
-            bullets.push(
-              { x: playerX, y: py - 18, vx: 0, vy: -560, color: palette.accent },
-              {
-                x: playerX - 8,
-                y: py - 14,
-                vx: -115,
-                vy: -535,
-                color: palette.primary,
-              },
-              {
-                x: playerX + 8,
-                y: py - 14,
-                vx: 115,
-                vy: -535,
-                color: palette.primary,
-              }
-            );
+            for (const spread of [-0.22, 0, 0.22]) {
+              const a = aimAngle + spread;
+              bullets.push({
+                x: playerX + Math.cos(a) * 14,
+                y: playerY + Math.sin(a) * 14,
+                vx: Math.cos(a) * bulletSpeed,
+                vy: Math.sin(a) * bulletSpeed,
+                color: spread === 0 ? palette.accent : palette.primary,
+              });
+            }
           } else {
             bullets.push({
-              x: playerX,
-              y: py - 18,
-              vx: 0,
-              vy: -560,
+              x: playerX + Math.cos(aimAngle) * 14,
+              y: playerY + Math.sin(aimAngle) * 14,
+              vx: Math.cos(aimAngle) * bulletSpeed,
+              vy: Math.sin(aimAngle) * bulletSpeed,
               color: palette.primary,
             });
           }
         }
 
+        // Enemigos emergiendo desde los 4 bordes de la arena
         enemySpawnTimer -= dt;
         if (enemySpawnTimer <= 0) {
           const interval = Math.max(
-            0.34,
-            (1.12 - wave * 0.07) / spawnMultiplier
+            0.38,
+            (1.18 - wave * 0.07) / spawnMultiplier
           );
           enemySpawnTimer = interval * (0.8 + Math.random() * 0.45);
           const roll = Math.random();
@@ -896,53 +1069,101 @@ export function ArcadeGameModal({
           if (wave >= 2 && roll > 0.78) kind = 'golem';
           else if (roll > 0.46) kind = 'hunter';
 
-          const radius = kind === 'golem' ? 23 : kind === 'hunter' ? 16 : 15;
+          const radius = kind === 'golem' ? 22 : kind === 'hunter' ? 15 : 14;
           const maxHp =
             kind === 'golem'
               ? 4 + Math.floor(wave / 2)
               : kind === 'hunter'
                 ? 2
                 : 1;
-          const bx = 34 + Math.random() * (width - 68);
+          const spawn = randomEdgeSpawn(width, height, radius + 12);
+          const baseSpeed =
+            (kind === 'golem' ? 66 : kind === 'hunter' ? 122 : 96) *
+            difficultyRamp;
+
           enemies.push({
-            x: bx,
-            baseX: bx,
-            y: -radius - 10,
-            vy:
-              (kind === 'golem' ? 68 : kind === 'hunter' ? 115 : 102) *
-              difficultyRamp,
+            x: spawn.x,
+            y: spawn.y,
+            vx: 0,
+            vy: 0,
+            speed: baseSpeed,
             radius,
             hp: maxHp,
             maxHp,
             kind,
             phase: Math.random() * Math.PI * 2,
             flash: 0,
+            shootCooldown: 2.1 + Math.random() * 1.4,
           });
         }
 
-        // Balas
+        // Balas del jugador
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           b.x += b.vx * dt;
           b.y += b.vy * dt;
-          if (b.y < -20 || b.x < -20 || b.x > width + 20) {
+          if (
+            b.y < -30 ||
+            b.y > height + 30 ||
+            b.x < -30 ||
+            b.x > width + 30
+          ) {
             bullets.splice(i, 1);
           }
         }
 
-        // Enemigos y colisiones
-        const barrierY = height - 34;
+        // Orbes disparados por Gólems
+        for (let i = enemyOrbs.length - 1; i >= 0; i--) {
+          const orb = enemyOrbs[i];
+          orb.x += orb.vx * dt;
+          orb.y += orb.vy * dt;
+          if (Math.hypot(orb.x - playerX, orb.y - playerY) < orb.radius + playerRadius - 3) {
+            enemyOrbs.splice(i, 1);
+            triggerPlayerDamage(playerX, playerY);
+            continue;
+          }
+          if (
+            orb.x < -30 ||
+            orb.x > width + 30 ||
+            orb.y < -30 ||
+            orb.y > height + 30
+          ) {
+            enemyOrbs.splice(i, 1);
+          }
+        }
+
+        // Enemigos persiguiendo / flanqueando en 360°
         for (let i = enemies.length - 1; i >= 0; i--) {
           const e = enemies[i];
-          e.y += e.vy * dt;
-          e.phase += dt * 3.4;
+          e.phase += dt * 4.0;
           e.flash = Math.max(0, e.flash - dt);
 
+          const toPlayerAngle = Math.atan2(playerY - e.y, playerX - e.x);
+          let moveAngle = toPlayerAngle;
           if (e.kind === 'hunter') {
-            e.x = Math.min(
-              width - e.radius - 10,
-              Math.max(e.radius + 10, e.baseX + Math.sin(e.phase) * 58)
-            );
+            // Zigzag lateral perpendicular al ángulo hacia el jugador
+            moveAngle = toPlayerAngle + Math.sin(e.phase) * 0.65;
+          }
+
+          e.vx = Math.cos(moveAngle) * e.speed;
+          e.vy = Math.sin(moveAngle) * e.speed;
+          e.x += e.vx * dt;
+          e.y += e.vy * dt;
+
+          // Los Gólems lanzan orbes arcanos dirigidos al jugador
+          if (e.kind === 'golem') {
+            e.shootCooldown -= dt;
+            if (e.shootCooldown <= 0) {
+              e.shootCooldown = Math.max(1.5, 2.8 - wave * 0.12);
+              const orbSpeed = 165 * speedMultiplier;
+              enemyOrbs.push({
+                x: e.x,
+                y: e.y,
+                vx: Math.cos(toPlayerAngle) * orbSpeed,
+                vy: Math.sin(toPlayerAngle) * orbSpeed,
+                radius: 7,
+              });
+            }
           }
 
           // Colisión bala-enemigo
@@ -957,7 +1178,7 @@ export function ArcadeGameModal({
               if (e.hp <= 0) {
                 destroyed = true;
                 const pts =
-                  e.kind === 'golem' ? 200 : e.kind === 'hunter' ? 90 : 50;
+                  e.kind === 'golem' ? 210 : e.kind === 'hunter' ? 95 : 55;
                 score += pts;
                 charge = Math.min(100, charge + (e.kind === 'golem' ? 26 : 11));
                 combo = Math.min(5, combo + (e.kind === 'golem' ? 1 : 0));
@@ -975,18 +1196,19 @@ export function ArcadeGameModal({
                 );
                 spawnFloat(e.x, e.y, `+${pts}`, palette.accent);
 
-                if (e.kind === 'golem' || Math.random() < 0.14) {
+                if (e.kind === 'golem' || Math.random() < 0.15) {
                   const pRoll = Math.random();
                   drops.push({
-                    x: e.x,
-                    y: e.y,
-                    vy: 130,
+                    x: Math.min(width - 32, Math.max(32, e.x)),
+                    y: Math.min(height - 32, Math.max(32, e.y)),
                     kind:
                       pRoll < 0.45
                         ? 'triple'
                         : pRoll < 0.8
                           ? 'rapid'
                           : 'heal',
+                    life: 10,
+                    pulse: 0,
                   });
                 }
                 enemies.splice(i, 1);
@@ -998,37 +1220,35 @@ export function ArcadeGameModal({
           }
           if (destroyed) continue;
 
-          // Colisión enemigo con jugador o barrera
-          if (
-            Math.hypot(e.x - playerX, e.y - py) < e.radius + playerRadius - 3 ||
-            e.y + e.radius >= barrierY
-          ) {
+          // Colisión enemigo con jugador
+          if (Math.hypot(e.x - playerX, e.y - playerY) < e.radius + playerRadius - 3) {
             enemies.splice(i, 1);
-            triggerPlayerDamage(playerX, py);
+            triggerPlayerDamage(playerX, playerY);
           }
         }
 
-        // Power-ups
+        // Power-ups distribuidos en el lugar donde cayeron los enemigos
         for (let i = drops.length - 1; i >= 0; i--) {
           const d = drops[i];
-          d.y += d.vy * dt;
-          if (Math.hypot(d.x - playerX, d.y - py) < playerRadius + 16) {
+          d.life -= dt;
+          d.pulse += dt * 5;
+          if (Math.hypot(d.x - playerX, d.y - playerY) < playerRadius + 18) {
             if (d.kind === 'triple') {
-              tripleTimer = 7.5;
+              tripleTimer = 8.0;
               spawnFloat(d.x, d.y, 'TRIPLE DISPARO', palette.accent);
             } else if (d.kind === 'rapid') {
-              rapidTimer = 7.0;
+              rapidTimer = 7.5;
               spawnFloat(d.x, d.y, 'SOBRECARGA', '#38BDF8');
             } else {
               lives = Math.min(maxLives, lives + 1);
-              spawnFloat(d.x, d.y, '+1 CRISTAL', '#34D399');
+              spawnFloat(d.x, d.y, '+1 ESCUDO', '#34D399');
             }
             synth.pickup(4);
             spawnBurst(d.x, d.y, palette.accent, 12, 160);
             drops.splice(i, 1);
             continue;
           }
-          if (d.y > height + 30) {
+          if (d.life <= 0) {
             drops.splice(i, 1);
           }
         }
@@ -1060,9 +1280,9 @@ export function ArcadeGameModal({
         if (sw.life <= 0) shockwaves.splice(i, 1);
       }
 
-      // =========================
-      // RENDERIZADO DEL LIENZO
-      // =========================
+      // =====================================================
+      // RENDERIZADO DEL LIENZO 2D
+      // =====================================================
       ctx.save();
       if (shakeMag > 0.4) {
         ctx.translate(
@@ -1075,21 +1295,26 @@ export function ArcadeGameModal({
       ctx.fillStyle = palette.bg;
       ctx.fillRect(-16, -16, width + 32, height + 32);
 
-      // Rejilla rúnica sutil
+      // Rejilla rúnica 2D con parallax
       ctx.strokeStyle = 'rgba(255,255,255,0.038)';
       ctx.lineWidth = 1;
-      for (let x = 0; x < width; x += 44) {
+      for (let x = gridOffsetX; x < width; x += 44) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
         ctx.stroke();
       }
-      for (let y = gridOffset; y < height; y += 44) {
+      for (let y = gridOffsetY; y < height; y += 44) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
         ctx.stroke();
       }
+
+      // Borde interior sutil de la arena
+      ctx.strokeStyle = `${palette.primary}30`;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(8, 8, width - 16, height - 16);
 
       // Estrellas
       for (const star of stars) {
@@ -1097,38 +1322,39 @@ export function ArcadeGameModal({
         ctx.fillRect(star.x, star.y, star.size, star.size);
       }
 
-      // Barrera del Bastión
-      if (engine === 'bastion') {
-        const barrierY = height - 34;
-        ctx.strokeStyle = `${palette.primary}99`;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(12, barrierY);
-        ctx.lineTo(width - 12, barrierY);
-        ctx.stroke();
-
-        ctx.fillStyle = `${palette.primary}18`;
-        ctx.fillRect(12, barrierY, width - 24, 24);
-      }
-
-      // Rayos del Vacío (Astral)
+      // Rayos del Vacío (verticales y horizontales)
       for (const b of beams) {
         if (b.timer > 0) {
           const blink = Math.sin(b.timer * 24) > 0 ? 0.55 : 0.2;
           ctx.fillStyle = `rgba(244, 63, 94, ${blink * 0.28})`;
-          ctx.fillRect(b.x - b.width / 2, 0, b.width, height);
           ctx.strokeStyle = palette.danger;
           ctx.setLineDash([8, 6]);
-          ctx.beginPath();
-          ctx.moveTo(b.x, 0);
-          ctx.lineTo(b.x, height);
-          ctx.stroke();
+          if (b.axis === 'vertical') {
+            ctx.fillRect(b.pos - b.thickness / 2, 0, b.thickness, height);
+            ctx.beginPath();
+            ctx.moveTo(b.pos, 0);
+            ctx.lineTo(b.pos, height);
+            ctx.stroke();
+          } else {
+            ctx.fillRect(0, b.pos - b.thickness / 2, width, b.thickness);
+            ctx.beginPath();
+            ctx.moveTo(0, b.pos);
+            ctx.lineTo(width, b.pos);
+            ctx.stroke();
+          }
           ctx.setLineDash([]);
         } else {
-          ctx.fillStyle = palette.danger;
-          ctx.fillRect(b.x - b.width / 2, 0, b.width, height);
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(b.x - b.width * 0.2, 0, b.width * 0.4, height);
+          if (b.axis === 'vertical') {
+            ctx.fillStyle = palette.danger;
+            ctx.fillRect(b.pos - b.thickness / 2, 0, b.thickness, height);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(b.pos - b.thickness * 0.2, 0, b.thickness * 0.4, height);
+          } else {
+            ctx.fillStyle = palette.danger;
+            ctx.fillRect(0, b.pos - b.thickness / 2, width, b.thickness);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, b.pos - b.thickness * 0.2, width, b.thickness * 0.4);
+          }
         }
       }
 
@@ -1145,6 +1371,8 @@ export function ArcadeGameModal({
 
       // Reliquias (Astral)
       for (const r of relics) {
+        const blink = r.life < 2 && Math.floor(r.life * 10) % 2 === 0;
+        if (blink) continue;
         const glow = 3 + Math.sin(r.pulse) * 2.5;
         ctx.save();
         ctx.translate(r.x, r.y);
@@ -1183,29 +1411,55 @@ export function ArcadeGameModal({
         ctx.restore();
       }
 
-      // Balas (Bastión)
+      // Balas del jugador (Bastión) orientadas según su vector
       for (const b of bullets) {
+        const ang = Math.atan2(b.vy, b.vx);
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(ang);
         ctx.fillStyle = b.color;
         ctx.shadowColor = b.color;
         ctx.shadowBlur = 8;
-        ctx.fillRect(b.x - 2.5, b.y - 10, 5, 16);
-        ctx.shadowBlur = 0;
+        ctx.fillRect(-8, -2.5, 16, 5);
+        ctx.restore();
+      }
+
+      // Orbes enemigos (Bastión)
+      for (const orb of enemyOrbs) {
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = palette.danger;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = palette.danger;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
       }
 
       // Power-ups (Bastión)
       for (const d of drops) {
+        const blink = d.life < 2 && Math.floor(d.life * 10) % 2 === 0;
+        if (blink) continue;
         const col =
           d.kind === 'triple'
             ? palette.accent
             : d.kind === 'rapid'
               ? '#38BDF8'
               : '#34D399';
+        const scale = 1 + Math.sin(d.pulse) * 0.08;
         ctx.save();
         ctx.translate(d.x, d.y);
+        ctx.scale(scale, scale);
         ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
         ctx.fillStyle = '#090B0E';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -1237,6 +1491,10 @@ export function ArcadeGameModal({
               ? '#FB7185'
               : palette.danger;
 
+        const enemyAngle = Math.atan2(playerY - e.y, playerX - e.x);
+
+        ctx.save();
+        ctx.rotate(enemyAngle + Math.PI / 2);
         ctx.fillStyle = fillCol;
         ctx.strokeStyle = strokeCol;
         ctx.lineWidth = 2.4;
@@ -1251,22 +1509,22 @@ export function ArcadeGameModal({
             else ctx.lineTo(px, pyLocal);
           }
         } else {
-          ctx.moveTo(0, e.radius);
-          ctx.lineTo(e.radius, -e.radius * 0.7);
-          ctx.lineTo(0, -e.radius * 0.25);
-          ctx.lineTo(-e.radius, -e.radius * 0.7);
+          ctx.moveTo(0, -e.radius);
+          ctx.lineTo(e.radius, e.radius * 0.72);
+          ctx.lineTo(0, e.radius * 0.25);
+          ctx.lineTo(-e.radius, e.radius * 0.72);
         }
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+        ctx.restore();
 
-        // Barra de vida para enemigos con > 1 HP
         if (e.maxHp > 1) {
           const barW = e.radius * 1.9;
           ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(-barW / 2, -e.radius - 10, barW, 4);
+          ctx.fillRect(-barW / 2, -e.radius - 11, barW, 4);
           ctx.fillStyle = strokeCol;
-          ctx.fillRect(-barW / 2, -e.radius - 10, barW * (e.hp / e.maxHp), 4);
+          ctx.fillRect(-barW / 2, -e.radius - 11, barW * (e.hp / e.maxHp), 4);
         }
         ctx.restore();
       }
@@ -1274,25 +1532,27 @@ export function ArcadeGameModal({
       // Rastro del jugador
       for (const t of trail) {
         ctx.fillStyle = palette.primary;
-        ctx.globalAlpha = Math.max(0, t.alpha * 0.55);
+        ctx.globalAlpha = Math.max(0, t.alpha * 0.5);
         ctx.beginPath();
-        ctx.arc(t.x, t.y + 6, 7, 0, Math.PI * 2);
+        ctx.arc(t.x, t.y, 6.5, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
 
-      // Jugador (Silueta Prisma / Centinela Arcano)
-      const blinkSkip = invulnTimer > 0 && Math.floor(invulnTimer * 18) % 2 === 0;
+      // Jugador orientado suavemente hacia su dirección de movimiento / puntería
+      const blinkSkip =
+        invulnTimer > 0 && Math.floor(invulnTimer * 18) % 2 === 0;
       if (!blinkSkip) {
         ctx.save();
-        ctx.translate(playerX, py);
+        ctx.translate(playerX, playerY);
         if (dashTimer > 0) {
           ctx.strokeStyle = palette.accent;
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.arc(0, 0, playerRadius + 8, 0, Math.PI * 2);
+          ctx.arc(0, 0, playerRadius + 9, 0, Math.PI * 2);
           ctx.stroke();
         }
+        ctx.rotate(facingAngle + Math.PI / 2);
         ctx.fillStyle = palette.primary;
         ctx.shadowColor = palette.primary;
         ctx.shadowBlur = 14;
@@ -1336,7 +1596,7 @@ export function ArcadeGameModal({
         ctx.font = '800 22px "Bricolage Grotesque", sans-serif';
         ctx.fillStyle = palette.accent;
         ctx.textAlign = 'center';
-        ctx.fillText(bannerText, width / 2, height * 0.34);
+        ctx.fillText(bannerText, width / 2, height * 0.22);
         ctx.restore();
       }
 
@@ -1357,12 +1617,6 @@ export function ArcadeGameModal({
   const isAbilityReady =
     game.engine === 'astral' ? hud.charge >= 50 : hud.charge >= 100;
 
-  function handleCanvasPointer(clientX: number) {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    pointerTargetXRef.current = clientX - rect.left;
-  }
-
   return (
     <div
       role="dialog"
@@ -1370,7 +1624,7 @@ export function ArcadeGameModal({
       aria-label={`Juego Arcade: ${game.title}`}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#05070B] md:bg-black/85 md:p-5"
     >
-      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#080B12] md:h-[min(860px,92dvh)] md:max-w-[540px] md:rounded-2xl md:border md:border-white/[0.12] md:shadow-2xl">
+      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#080B12] md:h-[min(860px,92dvh)] md:max-w-[580px] md:rounded-2xl md:border md:border-white/[0.12] md:shadow-2xl">
         {/* Barra HUD superior compacta */}
         <header className="z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] bg-[#0B0F18] px-3.5">
           <div className="flex items-center gap-3 min-w-0">
@@ -1447,7 +1701,7 @@ export function ArcadeGameModal({
           </div>
         </header>
 
-        {/* Área principal del lienzo (85%+ libre) */}
+        {/* Área principal del lienzo (85%+ libre, desplazamiento táctil relativo en 2D) */}
         <div
           ref={stageRef}
           className="relative flex-1 w-full overflow-hidden touch-none select-none"
@@ -1456,18 +1710,27 @@ export function ArcadeGameModal({
             ref={canvasRef}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
-              handleCanvasPointer(event.clientX);
+              pointerStateRef.current.activeId = event.pointerId;
+              pointerStateRef.current.lastX = event.clientX;
+              pointerStateRef.current.lastY = event.clientY;
             }}
             onPointerMove={(event) => {
-              if (event.buttons > 0 || event.pointerType === 'touch') {
-                handleCanvasPointer(event.clientX);
+              const ps = pointerStateRef.current;
+              if (ps.activeId !== event.pointerId) return;
+              ps.pendingDx += event.clientX - ps.lastX;
+              ps.pendingDy += event.clientY - ps.lastY;
+              ps.lastX = event.clientX;
+              ps.lastY = event.clientY;
+            }}
+            onPointerUp={(event) => {
+              if (pointerStateRef.current.activeId === event.pointerId) {
+                pointerStateRef.current.activeId = null;
               }
             }}
-            onPointerUp={() => {
-              pointerTargetXRef.current = null;
-            }}
-            onPointerCancel={() => {
-              pointerTargetXRef.current = null;
+            onPointerCancel={(event) => {
+              if (pointerStateRef.current.activeId === event.pointerId) {
+                pointerStateRef.current.activeId = null;
+              }
             }}
             className="block h-full w-full"
           />
@@ -1479,7 +1742,7 @@ export function ArcadeGameModal({
             </div>
           )}
 
-          {/* Botón táctil discreto de habilidad especial durante el juego */}
+          {/* Botón táctil cómodo para habilidad especial (sin interferir con el arrastre) */}
           {phase === 'PLAYING' && (
             <button
               type="button"
@@ -1488,7 +1751,7 @@ export function ArcadeGameModal({
                 triggerAbility();
               }}
               disabled={!isAbilityReady}
-              className={`absolute bottom-4 right-4 z-10 min-h-[50px] inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold tracking-wide transition-all active:scale-95 ${
+              className={`absolute bottom-5 right-4 z-10 min-h-[52px] inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold tracking-wide transition-all active:scale-95 ${
                 isAbilityReady
                   ? 'border-amber-300/60 bg-amber-400 text-[#090B0E] shadow-lg shadow-amber-400/20'
                   : 'border-white/[0.12] bg-[#11151E]/90 text-[#8F99AB]'

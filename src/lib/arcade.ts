@@ -38,12 +38,12 @@ export const BUILTIN_ARCADE_GAMES: ArcadeGameConfig[] = [
   {
     id: 'senda-astral',
     title: 'Senda Astral',
-    subtitle: 'Esquiva meteoros y captura runas de éter',
-    lore: 'Cruza el corredor de obsidiana guiando un prisma arcano. Encadena reliquias doradas para multiplicar tu puntuación y usa el impulso astral para atravesar rayos del vacío.',
-    genre: 'Acción · Esquiva',
+    subtitle: 'Esquiva amenazas 360° y captura runas de éter',
+    lore: 'Muévete libremente por toda la arena astral guiando tu prisma arcano. Esquiva meteoros y rayos desde todos los ángulos, encadena reliquias doradas y usa el impulso para romper el peligro.',
+    genre: 'Acción · Esquiva 2D',
     engine: 'astral',
     difficulty: 'normal',
-    controlsHint: '← → / A D o desliza · Espacio o botón Impulso',
+    controlsHint: 'WASD / ↑↓←→ o arrastra en cualquier parte · Espacio: Impulso',
     palette: {
       bg: '#080B12',
       primary: '#388BFF',
@@ -62,12 +62,12 @@ export const BUILTIN_ARCADE_GAMES: ArcadeGameConfig[] = [
   {
     id: 'bastion-de-runas',
     title: 'Bastión de Runas',
-    subtitle: 'Defiende la ciudadela contra oleadas espectrales',
-    lore: 'Mantén en pie el cristal del bastión disparando haces rúnicos contra espectros, cazadores y gólems blindados. Recoge sellos de triple disparo y libera el Pulso Nova cuando el cielo se cierre.',
-    genre: 'Arcade · Defensa',
+    subtitle: 'Combate libre 360° contra oleadas espectrales',
+    lore: 'Recorre toda la arena arcana disparando haces rúnicos en 360° contra espectros, cazadores y gólems que surgen desde los cuatro bordes. Recoge sellos de poder y desata el Pulso Nova.',
+    genre: 'Arcade · Arena 2D',
     engine: 'bastion',
     difficulty: 'dificil',
-    controlsHint: '← → / A D o desliza · Disparo automático · Espacio: Nova',
+    controlsHint: 'WASD / ↑↓←→ o arrastra en cualquier parte · Espacio: Pulso Nova',
     palette: {
       bg: '#0B0914',
       primary: '#F59E0B',
@@ -189,8 +189,8 @@ export function addCustomArcadeChallenge(
     difficulty: challenge.difficulty,
     controlsHint:
       challenge.baseEngine === 'astral'
-        ? '← → / A D o desliza · Espacio o botón Impulso'
-        : '← → / A D o desliza · Disparo automático · Espacio: Nova',
+        ? 'WASD / ↑↓←→ o arrastra en cualquier parte · Espacio: Impulso'
+        : 'WASD / ↑↓←→ o arrastra en cualquier parte · Espacio: Pulso Nova',
     palette: challenge.palette,
     speedMultiplier: challenge.speedMultiplier,
     spawnMultiplier: challenge.spawnMultiplier,
