@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Clock,
   Globe,
   Heart,
   Loader2,
@@ -175,15 +176,15 @@ export function PostDetailView({
   const isActualidad = post.mode === 'actualidad';
   const canModerate = Boolean(isOwner || (user && user.id === post.author_id));
   const authorName = getAuthorDisplayName(post.author);
-  const readMinutes = isActualidad ? estimateReadMinutes(post.content) : null;
+  const readMinutes = estimateReadMinutes(post.content);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 pb-28 sm:px-6 md:px-8 md:py-10 md:pb-16">
+    <div className="mx-auto max-w-3xl px-4 py-6 pb-24 sm:px-6 md:px-8 md:py-10 md:pb-16">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="min-h-[44px] -ml-2 inline-flex items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-[#9AA4B6] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+          className="min-h-[44px] -ml-2 inline-flex items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
         >
           <ArrowLeft size={18} aria-hidden="true" />
           <span>Volver a {isActualidad ? 'Actualidad' : 'Comunidad'}</span>
@@ -196,10 +197,10 @@ export function PostDetailView({
                 type="button"
                 onClick={() => void handleTogglePin()}
                 disabled={isTogglingPin}
-                className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   post.is_pinned
-                    ? 'border-amber-400/35 bg-amber-400/12 text-amber-300 hover:bg-amber-400/20'
-                    : 'border-white/[0.09] text-[#9AA4B6] hover:border-amber-400/30 hover:text-amber-300'
+                    ? 'border-amber-500/40 bg-amber-500/12 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-300'
                 }`}
               >
                 {post.is_pinned ? (
@@ -219,7 +220,7 @@ export function PostDetailView({
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-3 text-xs font-medium text-[#9AA4B6] hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <Pencil size={14} aria-hidden="true" />
               <span>Editar</span>
@@ -228,7 +229,7 @@ export function PostDetailView({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-3 text-xs font-medium text-[#9AA4B6] hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <Trash2 size={14} aria-hidden="true" />
               <span>Eliminar</span>
@@ -238,14 +239,14 @@ export function PostDetailView({
 
         {canModerate && confirmingDelete && (
           <div className="flex items-center gap-2 text-xs">
-            <span className="hidden sm:inline text-[#9AA4B6]">
+            <span className="hidden sm:inline text-[var(--text-secondary)]">
               ¿Eliminar publicación?
             </span>
             <button
               type="button"
               disabled={isDeleting}
               onClick={handleConfirmDelete}
-              className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 font-medium text-red-200 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
+              className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 font-semibold text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
             >
               {isDeleting && (
                 <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -256,7 +257,7 @@ export function PostDetailView({
               type="button"
               disabled={isDeleting}
               onClick={() => setConfirmingDelete(false)}
-              className="min-h-[38px] rounded-lg px-2.5 text-[#9AA4B6] hover:text-white transition-colors"
+              className="min-h-[38px] rounded-lg px-2.5 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors"
             >
               Cancelar
             </button>
@@ -265,43 +266,43 @@ export function PostDetailView({
       </div>
 
       {isActualidad ? (
-        <article className="border-b border-white/[0.08] pb-8">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[#7FB2FF]">
+        <article className="border-b border-[var(--border-subtle)] pb-8 transition-colors duration-300">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[var(--accent-primary)]">
             {post.is_pinned && (
               <>
-                <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+                <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-300">
                   <Pin size={12} aria-hidden="true" />
                   <span>Fijado</span>
                 </span>
-                <span aria-hidden="true" className="text-[#566072]">
+                <span aria-hidden="true" className="text-[var(--text-muted)]">
                   ·
                 </span>
               </>
             )}
-            <span>{post.category}</span>
-            <span aria-hidden="true" className="text-[#566072]">
+            <span className="font-semibold">{post.category}</span>
+            <span aria-hidden="true" className="text-[var(--text-muted)]">
               ·
             </span>
-            <time dateTime={post.created_at} className="text-[#8B95A5] tabular-nums">
+            <time
+              dateTime={post.created_at}
+              className="text-[var(--text-muted)] tabular-nums"
+            >
               {formatEditorialDate(post.created_at)}
             </time>
-            {readMinutes && (
-              <>
-                <span aria-hidden="true" className="text-[#566072]">
-                  ·
-                </span>
-                <span className="text-[#8B95A5] tabular-nums">
-                  {readMinutes} min de lectura
-                </span>
-              </>
-            )}
+            <span aria-hidden="true" className="text-[var(--text-muted)]">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1 text-[var(--text-muted)] tabular-nums">
+              <Clock size={12} aria-hidden="true" />
+              {readMinutes} min de lectura
+            </span>
           </div>
 
-          <h1 className="mt-3 text-balance font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
+          <h1 className="mt-3 text-balance font-display text-3xl font-bold leading-tight tracking-tight text-[var(--text-main)] sm:text-4xl">
             {post.title || 'Artículo sin título'}
           </h1>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-white/[0.07] py-4">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-[var(--border-subtle)] py-4 transition-colors duration-300">
             <div className="flex items-center gap-3 min-w-0">
               <Avatar
                 src={post.author?.avatar_url}
@@ -310,7 +311,7 @@ export function PostDetailView({
               />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-[#EEF2F8] truncate">
+                  <p className="text-sm font-semibold text-[var(--text-main)] truncate">
                     {authorName}
                   </p>
                   <OwnerBadge
@@ -319,7 +320,7 @@ export function PostDetailView({
                     size="sm"
                   />
                 </div>
-                <p className="text-xs text-[#8B95A5]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Publicado en Actualidad
                 </p>
               </div>
@@ -334,7 +335,7 @@ export function PostDetailView({
                     'Resúmeme este artículo en 4 puntos clave claros y objetivos.'
                   )
                 }
-                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors"
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
               >
                 <Sparkles size={14} aria-hidden="true" />
                 <span>Resumir con IA</span>
@@ -348,16 +349,20 @@ export function PostDetailView({
                     'Verifica en Google los datos, cifras o hechos más recientes mencionados en este artículo.'
                   )
                 }
-                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#121620] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white transition-colors"
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors duration-300"
               >
-                <Globe size={14} className="text-[#7FB2FF]" aria-hidden="true" />
+                <Globe
+                  size={14}
+                  className="text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
                 <span>Verificar datos</span>
               </button>
             </div>
           </div>
 
           {post.image_url && (
-            <div className="mt-7 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#11151D]">
+            <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
               <MediaImage
                 src={post.image_url}
                 alt={post.title || 'Imagen de portada del artículo'}
@@ -367,7 +372,7 @@ export function PostDetailView({
             </div>
           )}
 
-          <div className="mx-auto mt-8 max-w-[68ch] text-[16px] leading-[1.82] text-[#DCE2EC] whitespace-pre-line break-words">
+          <div className="mx-auto mt-8 max-w-[68ch] reading-prose text-[var(--text-main)] whitespace-pre-line break-words">
             {post.content}
           </div>
 
@@ -377,22 +382,26 @@ export function PostDetailView({
               onClick={handleToggleLike}
               disabled={isTogglingLike}
               aria-pressed={post.liked_by_me}
-              className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+              className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                 post.liked_by_me
-                  ? 'border-rose-400/35 bg-rose-500/12 text-rose-200'
-                  : 'border-white/[0.1] bg-[#121620] text-[#CBD5E1] hover:border-white/[0.2] hover:text-white'
+                  ? 'border-rose-500/35 bg-rose-500/12 text-rose-600 dark:text-rose-200'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
               }`}
             >
               <Heart
                 size={17}
-                className={post.liked_by_me ? 'fill-rose-400 text-rose-400' : ''}
+                className={
+                  post.liked_by_me
+                    ? 'fill-rose-500 text-rose-500 dark:fill-rose-400 dark:text-rose-400'
+                    : ''
+                }
                 aria-hidden="true"
               />
               <span className="tabular-nums">{post.likes_count}</span>
               <span className="text-xs opacity-80">Me gusta</span>
             </button>
 
-            <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[#8B95A5]">
+            <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[var(--text-muted)]">
               <MessageSquare size={17} aria-hidden="true" />
               <span className="tabular-nums">{post.comments_count}</span>
               <span className="text-xs">
@@ -402,9 +411,9 @@ export function PostDetailView({
           </div>
         </article>
       ) : (
-        <article className="border-b border-white/[0.08] pb-7">
+        <article className="border-b border-[var(--border-subtle)] pb-7 transition-colors duration-300">
           {post.is_pinned && (
-            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
               <Pin size={12} aria-hidden="true" />
               <span>Hilo fijado por el Dueño</span>
             </div>
@@ -418,7 +427,7 @@ export function PostDetailView({
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span className="font-semibold text-white truncate max-w-[180px]">
+                <span className="font-semibold text-[var(--text-main)] truncate max-w-[180px]">
                   {authorName}
                 </span>
                 <OwnerBadge
@@ -426,18 +435,18 @@ export function PostDetailView({
                   badge={post.author?.badge}
                   size="sm"
                 />
-                <span aria-hidden="true" className="text-[#566072]">
+                <span aria-hidden="true" className="text-[var(--text-muted)]">
                   ·
                 </span>
-                <span className="text-xs font-medium text-[#7FB2FF]">
+                <span className="text-xs font-semibold text-[var(--accent-primary)]">
                   {post.category}
                 </span>
-                <span aria-hidden="true" className="text-[#566072]">
+                <span aria-hidden="true" className="text-[var(--text-muted)]">
                   ·
                 </span>
                 <time
                   dateTime={post.created_at}
-                  className="text-xs text-[#8B95A5] tabular-nums"
+                  className="text-xs text-[var(--text-muted)] tabular-nums"
                 >
                   {formatRelativeDate(post.created_at)}
                 </time>
@@ -446,17 +455,17 @@ export function PostDetailView({
           </div>
 
           {post.title && (
-            <h1 className="mt-4 text-balance font-display text-2xl font-bold leading-snug tracking-tight text-white sm:text-3xl">
+            <h1 className="mt-4 text-balance font-display text-2xl font-bold leading-snug tracking-tight text-[var(--text-main)] sm:text-3xl">
               {post.title}
             </h1>
           )}
 
-          <p className="mt-3.5 text-[15.5px] leading-relaxed text-[#E2E8F0] whitespace-pre-line break-words">
+          <p className="mt-3.5 reading-prose text-[var(--text-main)] whitespace-pre-line break-words">
             {post.content}
           </p>
 
           {post.image_url && (
-            <div className="mt-5 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#11151D]">
+            <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
               <MediaImage
                 src={post.image_url}
                 alt={post.title || 'Imagen adjunta al hilo'}
@@ -473,22 +482,26 @@ export function PostDetailView({
                 onClick={handleToggleLike}
                 disabled={isTogglingLike}
                 aria-pressed={post.liked_by_me}
-                className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[44px] inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   post.liked_by_me
-                    ? 'border-rose-400/35 bg-rose-500/12 text-rose-200'
-                    : 'border-white/[0.1] bg-[#121620] text-[#CBD5E1] hover:border-white/[0.2] hover:text-white'
+                    ? 'border-rose-500/35 bg-rose-500/12 text-rose-600 dark:text-rose-200'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                 }`}
               >
                 <Heart
                   size={17}
-                  className={post.liked_by_me ? 'fill-rose-400 text-rose-400' : ''}
+                  className={
+                    post.liked_by_me
+                      ? 'fill-rose-500 text-rose-500 dark:fill-rose-400 dark:text-rose-400'
+                      : ''
+                  }
                   aria-hidden="true"
                 />
                 <span className="tabular-nums">{post.likes_count}</span>
                 <span className="text-xs opacity-80">Me gusta</span>
               </button>
 
-              <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[#8B95A5]">
+              <div className="min-h-[44px] inline-flex items-center gap-2 px-3 text-sm text-[var(--text-muted)]">
                 <MessageSquare size={17} aria-hidden="true" />
                 <span className="tabular-nums">{post.comments_count}</span>
                 <span className="text-xs">
@@ -500,7 +513,7 @@ export function PostDetailView({
             <button
               type="button"
               onClick={() => onOpenAssistant(post)}
-              className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/12 px-3.5 text-xs font-semibold text-[#9EC5FF] hover:bg-[#388BFF]/20 hover:text-white transition-colors"
+              className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
             >
               <Sparkles size={14} aria-hidden="true" />
               <span>Consultar / Verificar con IA</span>
@@ -512,9 +525,13 @@ export function PostDetailView({
       {actionError && (
         <div
           role="alert"
-          className="mt-5 flex items-center gap-2.5 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-100"
+          className="mt-5 flex items-center gap-2.5 rounded-xl border border-red-500/40 bg-red-500/12 px-4 py-3 text-sm text-red-700 dark:text-red-100"
         >
-          <AlertCircle size={17} className="shrink-0 text-red-400" aria-hidden="true" />
+          <AlertCircle
+            size={17}
+            className="shrink-0 text-red-500 dark:text-red-400"
+            aria-hidden="true"
+          />
           <span>{actionError}</span>
         </div>
       )}

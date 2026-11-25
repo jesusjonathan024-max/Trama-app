@@ -29,7 +29,35 @@
       content="Explora artículos de Actualidad, debates en Comunidad, novelas y manhwas en Biblioteca y minijuegos en el Arcade de Trama."
     />
 
-    <meta name="theme-color" content="#090B0E" />
+    <meta name="theme-color" content="#0F1115" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('trama_appearance_v1');
+          var prefs = raw ? JSON.parse(raw) : {};
+          var mode = prefs.themeMode === 'light' ? 'light' : 'dark';
+          var accent = prefs.accentColor === 'violet' ? 'violet' : 'blue';
+          var font =
+            prefs.fontSize === 'large' || prefs.fontSize === 'xl'
+              ? prefs.fontSize
+              : 'normal';
+          var root = document.documentElement;
+          root.classList.toggle('dark', mode === 'dark');
+          root.dataset.theme = mode;
+          root.dataset.accent = accent;
+          root.dataset.fontSize = font;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute('content', mode === 'dark' ? '#0F1115' : '#F8FAFC');
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+          document.documentElement.dataset.theme = 'dark';
+          document.documentElement.dataset.accent = 'blue';
+          document.documentElement.dataset.fontSize = 'normal';
+        }
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -54,7 +82,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-[#090B0E] text-[#F2F4F8] antialiased selection:bg-[#388BFF]/30 selection:text-white">
+  <body class="bg-[var(--bg-base)] text-[var(--text-main)] antialiased transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

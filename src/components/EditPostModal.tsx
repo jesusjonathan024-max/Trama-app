@@ -113,22 +113,22 @@ export function EditPostModal({
         }
       }}
     >
-      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-white/[0.1] bg-[#11151D] shadow-2xl sm:rounded-2xl">
-        <div className="shrink-0 border-b border-white/[0.08] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
+      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-2xl transition-colors duration-300 sm:rounded-2xl">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
           <div
             aria-hidden="true"
-            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-white/[0.14] sm:hidden"
+            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden"
           />
 
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2
                 id="edit-post-title"
-                className="font-display text-xl font-bold tracking-tight text-white sm:text-2xl"
+                className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
               >
                 Editar {isActualidad ? 'artículo' : 'hilo'}
               </h2>
-              <p className="mt-0.5 text-xs text-[#8F99AB]">
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 Modifica la categoría, el título o el texto de esta publicación.
               </p>
             </div>
@@ -138,7 +138,7 @@ export function EditPostModal({
               onClick={onClose}
               disabled={isSaving}
               aria-label="Cerrar editor"
-              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#97A1B2] hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <X size={20} aria-hidden="true" />
             </button>
@@ -151,7 +151,7 @@ export function EditPostModal({
           noValidate
         >
           <div>
-            <span className="mb-2 block text-sm font-medium text-[#D5DCE6]">
+            <span className="mb-2 block text-sm font-medium text-[var(--text-main)]">
               Categoría
             </span>
             <div className="flex flex-wrap gap-2">
@@ -162,10 +162,10 @@ export function EditPostModal({
                     key={item}
                     type="button"
                     onClick={() => setCategory(item)}
-                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                       isSelected
-                        ? 'border-[#388BFF]/60 bg-[#388BFF]/15 text-white'
-                        : 'border-white/[0.09] bg-[#0B0E14] text-[#97A1B2] hover:border-white/[0.18] hover:text-white'
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                     }`}
                   >
                     {item}
@@ -179,11 +179,11 @@ export function EditPostModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="edit-post-title-input"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 {isActualidad ? 'Título del artículo' : 'Título (opcional)'}
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {title.length} / {MAX_TITLE_LENGTH}
               </span>
             </div>
@@ -194,7 +194,7 @@ export function EditPostModal({
               maxLength={MAX_TITLE_LENGTH}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
@@ -202,11 +202,11 @@ export function EditPostModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="edit-post-content-input"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 {isActualidad ? 'Texto del artículo' : 'Texto del hilo'}
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {content.length} / {MAX_CONTENT_LENGTH}
               </span>
             </div>
@@ -217,18 +217,18 @@ export function EditPostModal({
               maxLength={MAX_CONTENT_LENGTH}
               value={content}
               onChange={(event) => setContent(event.target.value)}
-              className="w-full resize-y rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 py-3 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
           {errorMsg && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-500/40 bg-red-500/15 px-3.5 py-3 text-sm text-red-100"
+              className="flex items-start gap-2.5 rounded-xl border border-red-500/40 bg-red-500/12 px-3.5 py-3 text-sm text-red-700 dark:text-red-100"
             >
               <AlertCircle
                 size={18}
-                className="mt-0.5 shrink-0 text-red-400"
+                className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
                 aria-hidden="true"
               />
               <span>{errorMsg}</span>
@@ -240,14 +240,14 @@ export function EditPostModal({
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="min-h-[46px] rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm font-medium text-[#CBD5E1] hover:bg-white/[0.05] hover:text-white disabled:opacity-50 transition-colors"
+              className="min-h-[46px] rounded-xl border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 py-2.5 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               {isSaving ? (
                 <>

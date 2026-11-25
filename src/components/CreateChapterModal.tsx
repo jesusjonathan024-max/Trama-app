@@ -266,22 +266,22 @@ export function CreateChapterModal({
         }
       }}
     >
-      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col rounded-t-3xl border border-white/[0.1] bg-[#11151D] shadow-2xl sm:rounded-2xl">
-        <div className="shrink-0 border-b border-white/[0.08] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-2xl transition-colors duration-300 sm:rounded-2xl">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
           <div
             aria-hidden="true"
-            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-white/[0.14] sm:hidden"
+            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden"
           />
 
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h2
                 id="create-chapter-title"
-                className="font-display text-xl font-bold tracking-tight text-white sm:text-2xl"
+                className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
               >
                 Subir Capítulo
               </h2>
-              <p className="mt-0.5 truncate text-xs text-[#8F99AB]">
+              <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
                 {series.title} ·{' '}
                 {isManhwa ? 'Manhwa (imágenes)' : 'Novela (texto)'}
               </p>
@@ -292,7 +292,7 @@ export function CreateChapterModal({
               onClick={onClose}
               disabled={isSubmitting}
               aria-label="Cerrar formulario de capítulo"
-              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#97A1B2] hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <X size={20} aria-hidden="true" />
             </button>
@@ -308,7 +308,7 @@ export function CreateChapterModal({
             <div className="sm:col-span-4">
               <label
                 htmlFor="chapter-number"
-                className="mb-1.5 block text-sm font-medium text-[#D5DCE6]"
+                className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
               >
                 Número de capítulo
               </label>
@@ -320,14 +320,14 @@ export function CreateChapterModal({
                 required
                 value={chapterNumberInput}
                 onChange={(event) => setChapterNumberInput(event.target.value)}
-                className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm tabular-nums text-white focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm tabular-nums text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               />
             </div>
 
             <div className="sm:col-span-8">
               <label
                 htmlFor="chapter-title"
-                className="mb-1.5 block text-sm font-medium text-[#D5DCE6]"
+                className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
               >
                 Título del capítulo (opcional)
               </label>
@@ -338,7 +338,7 @@ export function CreateChapterModal({
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Ej. El primer encuentro"
-                className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               />
             </div>
           </div>
@@ -348,11 +348,11 @@ export function CreateChapterModal({
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <label
                   htmlFor="chapter-text"
-                  className="block text-sm font-medium text-[#D5DCE6]"
+                  className="block text-sm font-medium text-[var(--text-main)]"
                 >
                   Contenido del capítulo
                 </label>
-                <span className="text-xs tabular-nums text-[#7D8799]">
+                <span className="text-xs tabular-nums text-[var(--text-muted)]">
                   {wordCount} palabras
                   {wordCount > 0
                     ? ` · ${estimateReadMinutes(textContent)} min`
@@ -366,24 +366,24 @@ export function CreateChapterModal({
                 value={textContent}
                 onChange={(event) => setTextContent(event.target.value)}
                 placeholder="Escribe o pega aquí el texto completo del capítulo. Los saltos de párrafo se conservarán en el lector…"
-                className="w-full resize-y rounded-xl border border-white/[0.1] bg-[#0B0E14] px-4 py-3.5 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3.5 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               />
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <span className="block text-sm font-medium text-[#D5DCE6]">
+                  <span className="block text-sm font-medium text-[var(--text-main)]">
                     Páginas del capítulo
                   </span>
-                  <p className="text-xs text-[#7D8799]">
+                  <p className="text-xs text-[var(--text-secondary)]">
                     Elige las imágenes desde tu galería; puedes reordenarlas
                     antes de publicar.
                   </p>
                 </div>
 
                 {pages.length > 0 && (
-                  <span className="text-xs font-semibold tabular-nums text-[#9CC6FF]">
+                  <span className="text-xs font-semibold tabular-nums text-[var(--accent-primary)]">
                     {pages.length}{' '}
                     {pages.length === 1 ? 'página' : 'páginas'}
                   </span>
@@ -403,7 +403,7 @@ export function CreateChapterModal({
 
               <label
                 htmlFor={fileInputId}
-                className={`min-h-[56px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[#388BFF]/45 bg-[#0B0E14] px-4 py-3.5 text-sm font-semibold text-[#CBE0FF] hover:border-[#388BFF] hover:bg-[#101724] hover:text-white transition-colors cursor-pointer select-none ${
+                className={`min-h-[56px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-3.5 text-sm font-semibold text-[var(--accent-primary)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer select-none ${
                   isSubmitting ? 'pointer-events-none opacity-50' : ''
                 }`}
               >
@@ -416,15 +416,15 @@ export function CreateChapterModal({
               </label>
 
               {pages.length > 0 && (
-                <div className="space-y-3 rounded-xl border border-white/[0.08] bg-[#0B0E14] p-3">
+                <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3">
                   {/* Cuadrícula de miniaturas con número de página y controles */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {pages.map((page, index) => (
                       <div
                         key={page.id}
-                        className="flex flex-col overflow-hidden rounded-xl border border-white/[0.09] bg-[#121620]"
+                        className="flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]"
                       >
-                        <div className="relative aspect-[3/4] w-full bg-[#090B0E]">
+                        <div className="relative aspect-[3/4] w-full bg-[var(--bg-subtle)]">
                           <img
                             src={page.previewUrl}
                             alt={`Miniatura página ${index + 1}`}
@@ -438,14 +438,14 @@ export function CreateChapterModal({
                             disabled={isSubmitting}
                             onClick={() => removePage(page.id)}
                             aria-label={`Quitar página ${index + 1}`}
-                            className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg bg-black/75 text-red-300 hover:bg-red-500/80 hover:text-white disabled:opacity-40 transition-colors"
+                            className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg bg-black/75 text-red-300 hover:bg-red-600 hover:text-white disabled:opacity-40 transition-colors"
                           >
                             <Trash2 size={14} aria-hidden="true" />
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between gap-1 border-t border-white/[0.07] px-2 py-1.5">
-                          <span className="truncate text-[11px] text-[#8F99AB]">
+                        <div className="flex items-center justify-between gap-1 border-t border-[var(--border-subtle)] px-2 py-1.5">
+                          <span className="truncate text-[11px] text-[var(--text-secondary)]">
                             {page.file.name}
                           </span>
                           <div className="flex shrink-0 items-center gap-0.5">
@@ -454,7 +454,7 @@ export function CreateChapterModal({
                               disabled={index === 0 || isSubmitting}
                               onClick={() => movePage(index, -1)}
                               aria-label={`Mover página ${index + 1} antes`}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9AA4B6] hover:bg-white/[0.08] hover:text-white disabled:opacity-25 transition-colors"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-25 transition-colors"
                             >
                               <ArrowUp size={14} aria-hidden="true" />
                             </button>
@@ -463,7 +463,7 @@ export function CreateChapterModal({
                               disabled={index === pages.length - 1 || isSubmitting}
                               onClick={() => movePage(index, 1)}
                               aria-label={`Mover página ${index + 1} después`}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9AA4B6] hover:bg-white/[0.08] hover:text-white disabled:opacity-25 transition-colors"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-25 transition-colors"
                             >
                               <ArrowDown size={14} aria-hidden="true" />
                             </button>
@@ -473,7 +473,7 @@ export function CreateChapterModal({
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-white/[0.07] pt-2.5 text-xs text-[#838D9F]">
+                  <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5 text-xs text-[var(--text-secondary)]">
                     <span className="tabular-nums">
                       Total: {pages.length}{' '}
                       {pages.length === 1 ? 'imagen lista' : 'imágenes listas'}
@@ -482,7 +482,7 @@ export function CreateChapterModal({
                       type="button"
                       disabled={isSubmitting}
                       onClick={clearAllPages}
-                      className="min-h-[34px] rounded-lg px-2.5 font-medium text-red-300 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+                      className="min-h-[34px] rounded-lg px-2.5 font-medium text-red-600 dark:text-red-300 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
                     >
                       Limpiar todas
                     </button>
@@ -493,8 +493,8 @@ export function CreateChapterModal({
           )}
 
           {uploadProgress && (
-            <div className="rounded-xl border border-[#388BFF]/35 bg-[#388BFF]/10 p-3.5">
-              <div className="flex items-center justify-between text-xs font-medium text-[#CFE2FF]">
+            <div className="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-3.5">
+              <div className="flex items-center justify-between text-xs font-medium text-[var(--accent-primary)]">
                 <span>Subiendo páginas al bucket media…</span>
                 <span className="tabular-nums">
                   {uploadProgress.current} / {uploadProgress.total}
@@ -507,11 +507,11 @@ export function CreateChapterModal({
             <div
               ref={errorBoxRef}
               role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-3.5 text-sm font-medium text-red-100"
+              className="flex items-start gap-2.5 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-3.5 text-sm font-medium text-red-700 dark:text-red-100"
             >
               <AlertCircle
                 size={18}
-                className="mt-0.5 shrink-0 text-red-400"
+                className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
                 aria-hidden="true"
               />
               <span className="break-words">{errorMsg}</span>
@@ -523,14 +523,14 @@ export function CreateChapterModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="min-h-[46px] rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm font-medium text-[#CBD5E1] hover:bg-white/[0.05] hover:text-white disabled:opacity-50 transition-colors"
+              className="min-h-[46px] rounded-xl border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 py-2.5 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               {isSubmitting ? (
                 <>

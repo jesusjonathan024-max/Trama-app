@@ -206,23 +206,23 @@ export function CreatePostModal({
         }
       }}
     >
-      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-white/[0.1] bg-[#11151D] shadow-2xl sm:rounded-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-2xl transition-colors duration-300 sm:rounded-2xl">
         {/* Cabecera fija del modal */}
-        <div className="shrink-0 border-b border-white/[0.08] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
           <div
             aria-hidden="true"
-            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-white/[0.14] sm:hidden"
+            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden"
           />
 
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2
                 id="create-post-title"
-                className="font-display text-xl font-bold tracking-tight text-white sm:text-2xl"
+                className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
               >
                 Nueva publicación
               </h2>
-              <p className="mt-0.5 text-xs text-[#8F99AB]">
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 Elige el modo y comparte tu artículo o hilo en Trama.
               </p>
             </div>
@@ -232,7 +232,7 @@ export function CreatePostModal({
               onClick={onClose}
               disabled={isSubmitting}
               aria-label="Cerrar formulario de publicación"
-              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#97A1B2] hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <X size={20} aria-hidden="true" />
             </button>
@@ -247,17 +247,17 @@ export function CreatePostModal({
         >
           {/* Paso 1: Selector de Modo */}
           <div>
-            <span className="mb-2 block text-xs font-medium text-[#A9B3C4]">
+            <span className="mb-2 block text-xs font-medium text-[var(--text-secondary)]">
               Modo de publicación
             </span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/[0.08] bg-[#0B0E14] p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
               <button
                 type="button"
                 onClick={() => handleSwitchMode('actualidad')}
-                className={`min-h-[42px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[42px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   mode === 'actualidad'
-                    ? 'bg-[#1D2432] text-white'
-                    : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                    ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                 }`}
               >
                 Actualidad
@@ -265,10 +265,10 @@ export function CreatePostModal({
               <button
                 type="button"
                 onClick={() => handleSwitchMode('comunidad')}
-                className={`min-h-[42px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[42px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   mode === 'comunidad'
-                    ? 'bg-[#1D2432] text-white'
-                    : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                    ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                 }`}
               >
                 Comunidad
@@ -280,7 +280,7 @@ export function CreatePostModal({
           <div>
             <label
               htmlFor="post-category"
-              className="mb-2 block text-sm font-medium text-[#D5DCE6]"
+              className="mb-2 block text-sm font-medium text-[var(--text-main)]"
             >
               Categoría
             </label>
@@ -299,10 +299,10 @@ export function CreatePostModal({
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => setCategory(item)}
-                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                    className={`min-h-[40px] rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                       isSelected
-                        ? 'border-[#388BFF]/60 bg-[#388BFF]/15 text-white'
-                        : 'border-white/[0.09] bg-[#0B0E14] text-[#97A1B2] hover:border-white/[0.18] hover:text-white'
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                     }`}
                   >
                     {item}
@@ -317,13 +317,13 @@ export function CreatePostModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="post-title"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 {mode === 'actualidad'
                   ? 'Título del artículo'
                   : 'Título (opcional)'}
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {title.length} / {MAX_TITLE_LENGTH}
               </span>
             </div>
@@ -339,7 +339,7 @@ export function CreatePostModal({
                   ? 'Un titular claro y preciso para tu artículo'
                   : 'Añade un título breve si quieres destacar el tema'
               }
-              className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
@@ -348,13 +348,13 @@ export function CreatePostModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="post-content"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 {mode === 'actualidad'
                   ? 'Texto del artículo'
                   : 'Texto del hilo'}
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {content.length} / {MAX_CONTENT_LENGTH}
               </span>
             </div>
@@ -370,13 +370,13 @@ export function CreatePostModal({
                   ? 'Desarrolla tu noticia, crónica o análisis con párrafos separados…'
                   : '¿Qué quieres debatir o compartir hoy con la comunidad?'
               }
-              className="w-full resize-y rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 py-3 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
           {/* Imagen opcional */}
           <div>
-            <span className="mb-2 block text-sm font-medium text-[#D5DCE6]">
+            <span className="mb-2 block text-sm font-medium text-[var(--text-main)]">
               Imagen (opcional)
             </span>
 
@@ -390,7 +390,7 @@ export function CreatePostModal({
             />
 
             {previewUrl ? (
-              <div className="relative overflow-hidden rounded-xl border border-white/[0.1] bg-[#0B0E14]">
+              <div className="relative overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
                 <img
                   src={previewUrl}
                   alt="Vista previa de la imagen seleccionada"
@@ -412,7 +412,7 @@ export function CreatePostModal({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isSubmitting}
-                className="min-h-[52px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-white/[0.15] bg-[#0B0E14]/70 px-4 py-3 text-sm font-medium text-[#A9B3C4] hover:border-white/[0.28] hover:bg-[#0F131B] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                className="min-h-[52px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
                 <ImagePlus size={18} aria-hidden="true" />
                 <span>Adjuntar imagen · JPG, PNG, WebP o GIF (máx. 5 MB)</span>
@@ -423,11 +423,11 @@ export function CreatePostModal({
           {errorMsg && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-200"
+              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-700 dark:text-red-200"
             >
               <AlertCircle
                 size={18}
-                className="mt-0.5 shrink-0 text-red-400"
+                className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
                 aria-hidden="true"
               />
               <span>{errorMsg}</span>
@@ -440,14 +440,14 @@ export function CreatePostModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="min-h-[46px] rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm font-medium text-[#CBD5E1] hover:bg-white/[0.05] hover:text-white disabled:opacity-50 transition-colors"
+              className="min-h-[46px] rounded-xl border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 py-2.5 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               {isSubmitting ? (
                 <>

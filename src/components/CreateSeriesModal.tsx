@@ -181,22 +181,22 @@ export function CreateSeriesModal({
         }
       }}
     >
-      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-white/[0.1] bg-[#11151D] shadow-2xl sm:rounded-2xl">
-        <div className="shrink-0 border-b border-white/[0.08] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
+      <div className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-2xl transition-colors duration-300 sm:rounded-2xl">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-5 pt-3 pb-4 sm:px-6 sm:pt-5">
           <div
             aria-hidden="true"
-            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-white/[0.14] sm:hidden"
+            className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden"
           />
 
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2
                 id="create-series-title"
-                className="font-display text-xl font-bold tracking-tight text-white sm:text-2xl"
+                className="font-display text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl"
               >
                 Nueva Obra
               </h2>
-              <p className="mt-0.5 text-xs text-[#8F99AB]">
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 Registra una novela o un manhwa en el catálogo de Biblioteca.
               </p>
             </div>
@@ -206,7 +206,7 @@ export function CreateSeriesModal({
               onClick={onClose}
               disabled={isSubmitting}
               aria-label="Cerrar formulario"
-              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#97A1B2] hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <X size={20} aria-hidden="true" />
             </button>
@@ -220,17 +220,17 @@ export function CreateSeriesModal({
         >
           {/* Tipo de obra */}
           <div>
-            <span className="mb-2 block text-xs font-medium text-[#A9B3C4]">
+            <span className="mb-2 block text-xs font-medium text-[var(--text-secondary)]">
               Formato
             </span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/[0.08] bg-[#0B0E14] p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
               <button
                 type="button"
                 onClick={() => setType('novela')}
-                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   type === 'novela'
-                    ? 'bg-[#1D2D46] text-[#9CC6FF]'
-                    : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                    ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)] shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                 }`}
               >
                 Novela
@@ -238,10 +238,10 @@ export function CreateSeriesModal({
               <button
                 type="button"
                 onClick={() => setType('manhwa')}
-                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                className={`min-h-[42px] rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                   type === 'manhwa'
-                    ? 'bg-[#3A2B14] text-[#FCD38D]'
-                    : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                    ? 'bg-amber-500/18 text-amber-800 dark:text-amber-200 shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                 }`}
               >
                 Manhwa
@@ -254,11 +254,11 @@ export function CreateSeriesModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="series-title"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 Título
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {title.length} / {MAX_TITLE_LENGTH}
               </span>
             </div>
@@ -270,7 +270,7 @@ export function CreateSeriesModal({
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Ej. Crónicas del Alba o Sombras de Seúl"
-              className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
@@ -279,7 +279,7 @@ export function CreateSeriesModal({
             <div>
               <label
                 htmlFor="series-genre"
-                className="mb-1.5 block text-sm font-medium text-[#D5DCE6]"
+                className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
               >
                 Género
               </label>
@@ -287,10 +287,10 @@ export function CreateSeriesModal({
                 id="series-genre"
                 value={genre}
                 onChange={(event) => setGenre(event.target.value)}
-                className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               >
                 {SERIES_GENRES.map((item) => (
-                  <option key={item} value={item} className="bg-[#11151D]">
+                  <option key={item} value={item} className="bg-[var(--bg-card)] text-[var(--text-main)]">
                     {item}
                   </option>
                 ))}
@@ -298,19 +298,19 @@ export function CreateSeriesModal({
             </div>
 
             <div>
-              <span className="mb-1.5 block text-sm font-medium text-[#D5DCE6]">
+              <span className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
                 Estado
               </span>
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/[0.1] bg-[#0B0E14] p-1">
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
                 {SERIES_STATUSES.map((item) => (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setStatus(item)}
-                    className={`min-h-[36px] rounded-lg px-2 text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                    className={`min-h-[36px] rounded-lg px-2 text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                       status === item
-                        ? 'bg-[#1D2432] text-white'
-                        : 'text-[#8B95A5] hover:text-white'
+                        ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                     }`}
                   >
                     {item}
@@ -325,11 +325,11 @@ export function CreateSeriesModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="series-synopsis"
-                className="block text-sm font-medium text-[#D5DCE6]"
+                className="block text-sm font-medium text-[var(--text-main)]"
               >
                 Sinopsis
               </label>
-              <span className="text-xs tabular-nums text-[#727C8F]">
+              <span className="text-xs tabular-nums text-[var(--text-muted)]">
                 {synopsis.length} / {MAX_SYNOPSIS_LENGTH}
               </span>
             </div>
@@ -341,13 +341,13 @@ export function CreateSeriesModal({
               value={synopsis}
               onChange={(event) => setSynopsis(event.target.value)}
               placeholder="Resume la premisa de tu historia sin adelantar giros clave…"
-              className="w-full resize-y rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 py-3 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
           {/* Portada */}
           <div>
-            <span className="mb-2 block text-sm font-medium text-[#D5DCE6]">
+            <span className="mb-2 block text-sm font-medium text-[var(--text-main)]">
               Portada vertical (recomendado 3:4)
             </span>
             <input
@@ -360,17 +360,17 @@ export function CreateSeriesModal({
             />
 
             {coverPreview ? (
-              <div className="flex items-start gap-4 rounded-xl border border-white/[0.1] bg-[#0B0E14] p-3">
+              <div className="flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3">
                 <img
                   src={coverPreview}
                   alt="Vista previa de la portada"
-                  className="aspect-[3/4] w-24 shrink-0 rounded-lg object-cover border border-white/[0.08]"
+                  className="aspect-[3/4] w-24 shrink-0 rounded-lg object-cover border border-[var(--border-subtle)]"
                 />
                 <div className="min-w-0 flex-1 space-y-2 pt-1">
-                  <p className="text-xs font-medium text-[#DCE2EC] truncate">
+                  <p className="text-xs font-medium text-[var(--text-main)] truncate">
                     {coverFile?.name}
                   </p>
-                  <p className="text-xs text-[#7D8799]">
+                  <p className="text-xs text-[var(--text-secondary)]">
                     Lista para subirse al bucket media.
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
@@ -378,7 +378,7 @@ export function CreateSeriesModal({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isSubmitting}
-                      className="min-h-[38px] rounded-lg border border-white/[0.12] px-3 text-xs font-medium text-[#DCE2EC] hover:bg-white/[0.06] transition-colors"
+                      className="min-h-[38px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
                     >
                       Cambiar
                     </button>
@@ -386,7 +386,7 @@ export function CreateSeriesModal({
                       type="button"
                       onClick={clearCover}
                       disabled={isSubmitting}
-                      className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 px-3 text-xs font-medium text-red-300 hover:bg-red-500/10 transition-colors"
+                      className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 px-3 text-xs font-medium text-red-600 dark:text-red-300 hover:bg-red-500/10 transition-colors"
                     >
                       <Trash2 size={13} aria-hidden="true" />
                       <span>Quitar</span>
@@ -399,7 +399,7 @@ export function CreateSeriesModal({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isSubmitting}
-                className="min-h-[54px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-white/[0.15] bg-[#0B0E14]/70 px-4 py-3 text-sm font-medium text-[#A9B3C4] hover:border-white/[0.28] hover:bg-[#0F131B] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                className="min-h-[54px] w-full flex items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
                 <ImagePlus size={18} aria-hidden="true" />
                 <span>Subir portada · JPG, PNG, WebP o GIF (máx. 5 MB)</span>
@@ -410,11 +410,11 @@ export function CreateSeriesModal({
           {errorMsg && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-200"
+              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-700 dark:text-red-200"
             >
               <AlertCircle
                 size={18}
-                className="mt-0.5 shrink-0 text-red-400"
+                className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
                 aria-hidden="true"
               />
               <span>{errorMsg}</span>
@@ -426,14 +426,14 @@ export function CreateSeriesModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="min-h-[46px] rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm font-medium text-[#CBD5E1] hover:bg-white/[0.05] hover:text-white disabled:opacity-50 transition-colors"
+              className="min-h-[46px] rounded-xl border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] disabled:opacity-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-5 py-2.5 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               {isSubmitting ? (
                 <>

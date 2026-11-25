@@ -17,12 +17,14 @@ import {
   Loader2,
   LogOut,
   MessageSquare,
+  Palette,
   RefreshCw,
   Save,
   Search,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   fetchAllMembers,
   fetchOwnerStats,
@@ -36,6 +38,7 @@ import {
   isSafeHttpUrl,
   supabase,
 } from '../lib/supabase';
+import { AppearanceControls } from './AppearanceControls';
 import { Avatar } from './Avatar';
 import { OwnerBadge } from './OwnerBadge';
 
@@ -70,6 +73,7 @@ export function ProfileSection({
     setProfileState,
     signOut,
   } = useAuth();
+  const { isSyncingPrefs } = useTheme();
 
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
@@ -200,7 +204,7 @@ export function ProfileSection({
         .from('profiles')
         .update(payload)
         .eq('id', user.id)
-        .select('id, username, bio, avatar_url, role, badge')
+        .select('id, username, bio, avatar_url, role, badge, theme_mode, accent_color, font_size')
         .maybeSingle();
 
       if (error) {
@@ -216,6 +220,9 @@ export function ProfileSection({
             avatar_url: data.avatar_url ?? null,
             role: data.role ?? profile?.role ?? null,
             badge: data.badge ?? profile?.badge ?? null,
+            theme_mode: data.theme_mode ?? profile?.theme_mode ?? null,
+            accent_color: data.accent_color ?? profile?.accent_color ?? null,
+            font_size: data.font_size ?? profile?.font_size ?? null,
           },
           true
         );
@@ -232,7 +239,7 @@ export function ProfileSection({
         },
         { onConflict: 'id' }
       )
-      .select('id, username, bio, avatar_url, role, badge')
+      .select('id, username, bio, avatar_url, role, badge, theme_mode, accent_color, font_size')
       .single();
 
     if (error) {
@@ -247,6 +254,9 @@ export function ProfileSection({
         avatar_url: data.avatar_url ?? null,
         role: data.role ?? profile?.role ?? null,
         badge: data.badge ?? profile?.badge ?? null,
+        theme_mode: data.theme_mode ?? profile?.theme_mode ?? null,
+        accent_color: data.accent_color ?? profile?.accent_color ?? null,
+        font_size: data.font_size ?? profile?.font_size ?? null,
       },
       true
     );
@@ -420,8 +430,8 @@ export function ProfileSection({
     return (
       <section className="mx-auto max-w-4xl px-5 py-10 md:px-8 md:py-14">
         <div className="space-y-6 animate-pulse">
-          <div className="h-8 w-44 rounded-lg bg-[#151922]" />
-          <div className="h-64 w-full rounded-2xl bg-[#12151C] border border-white/[0.07]" />
+          <div className="h-8 w-44 rounded-lg bg-[var(--bg-elevated)]" />
+          <div className="h-64 w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)]" />
         </div>
       </section>
     );
@@ -429,20 +439,40 @@ export function ProfileSection({
 
   if (!isAuthenticated || !user) {
     return (
-      <section className="mx-auto flex min-h-[calc(100dvh-10rem)] max-w-xl flex-col items-center justify-center px-5 py-16 text-center">
-        <h1 className="text-balance font-display text-3xl font-bold tracking-tight text-white">
-          Mi Perfil
-        </h1>
-        <p className="mt-3 text-base text-[#97A1B2]">
-          Inicia sesión o crea una cuenta para editar tu nombre de usuario, tu biografía y tu foto de perfil.
-        </p>
-        <button
-          type="button"
-          onClick={onOpenAuth}
-          className="mt-7 min-h-[48px] rounded-xl bg-[#388BFF] px-5 py-3 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
-        >
-          Iniciar sesión / Registrarse
-        </button>
+      <section className="mx-auto max-w-xl px-5 py-12 space-y-8">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center transition-colors duration-300">
+          <h1 className="text-balance font-display text-3xl font-bold tracking-tight text-[var(--text-main)]">
+            Mi Perfil
+          </h1>
+          <p className="mt-3 text-sm sm:text-base text-[var(--text-secondary)]">
+            Inicia sesión o crea una cuenta para editar tu nombre de usuario, tu biografía, tu foto y sincronizar tus preferencias de apariencia.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="mt-7 min-h-[48px] rounded-xl bg-[var(--accent-primary)] px-5 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+          >
+            Iniciar sesión / Registrarse
+          </button>
+        </div>
+
+        {/* Ajustes de apariencia disponibles también antes de iniciar sesión */}
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6 transition-colors duration-300">
+          <div className="mb-4 flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+              <Palette size={18} aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-bold text-[var(--text-main)]">
+                Apariencia y Lectura
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                Personaliza el tema, color de acento y tamaño de letra en este dispositivo.
+              </p>
+            </div>
+          </div>
+          <AppearanceControls />
+        </div>
       </section>
     );
   }
@@ -454,21 +484,21 @@ export function ProfileSection({
   return (
     <section
       aria-labelledby="profile-heading"
-      className="mx-auto max-w-4xl px-4 py-8 pb-28 sm:px-6 md:px-8 md:py-12 md:pb-16"
+      className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 md:px-8 md:py-12 md:pb-16"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between border-b border-white/[0.08] pb-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between border-b border-[var(--border-subtle)] pb-6 transition-colors duration-300">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1
               id="profile-heading"
-              className="font-display text-3xl font-bold tracking-tight text-white"
+              className="font-display text-3xl font-bold tracking-tight text-[var(--text-main)]"
             >
               Mi Perfil
             </h1>
             <OwnerBadge role={profile?.role} badge={profile?.badge} size="md" />
           </div>
-          <p className="mt-1.5 text-sm text-[#97A1B2]">
-            Administra tu información pública y tu foto de perfil.
+          <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
+            Administra tu información pública, tu foto y tus preferencias de lectura.
           </p>
         </div>
 
@@ -476,7 +506,7 @@ export function ProfileSection({
           type="button"
           onClick={handleSignOut}
           disabled={isSigningOut}
-          className="mt-3 sm:mt-0 min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-[#12151C] px-4 py-2 text-sm font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:bg-[#191E2A] hover:text-white disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+          className="mt-3 sm:mt-0 min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] disabled:opacity-60 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
         >
           {isSigningOut ? (
             <Loader2 size={16} className="animate-spin" aria-hidden="true" />
@@ -487,25 +517,59 @@ export function ProfileSection({
         </button>
       </div>
 
+      {/* Tarjeta de Apariencia y Lectura (sincronizada con Supabase profiles) */}
+      <div
+        aria-labelledby="appearance-heading"
+        className="mt-7 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300"
+      >
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+              <Palette size={18} aria-hidden="true" />
+            </div>
+            <div>
+              <h2
+                id="appearance-heading"
+                className="font-display text-lg font-bold tracking-tight text-[var(--text-main)]"
+              >
+                Apariencia y Lectura
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                Tus preferencias se guardan automáticamente en tu cuenta de Trama.
+              </p>
+            </div>
+          </div>
+
+          {isSyncingPrefs && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-primary)]">
+              <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+              <span>Guardando…</span>
+            </span>
+          )}
+        </div>
+
+        <AppearanceControls />
+      </div>
+
       {/* Panel privado de estadísticas del Dueño (visible exclusivamente para role === 'owner') */}
       {isOwner && (
         <div
           aria-labelledby="owner-stats-heading"
-          className="mt-7 rounded-2xl border border-amber-400/25 bg-[#12151D] p-5 sm:p-6"
+          className="mt-7 rounded-2xl border border-amber-500/35 dark:border-amber-400/25 bg-[var(--bg-card)] p-5 sm:p-6 shadow-sm transition-colors duration-300"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/12 text-amber-300">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/12 text-amber-600 dark:text-amber-300">
                 <Crown size={18} aria-hidden="true" />
               </div>
               <div>
                 <h2
                   id="owner-stats-heading"
-                  className="font-display text-lg font-bold tracking-tight text-white"
+                  className="font-display text-lg font-bold tracking-tight text-[var(--text-main)]"
                 >
                   Panel del Dueño
                 </h2>
-                <p className="text-xs text-[#8F99AB]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Resumen general privado de Trama · Solo visible para tu cuenta
                 </p>
               </div>
@@ -516,11 +580,13 @@ export function ProfileSection({
               onClick={() => void loadOwnerPanelData()}
               disabled={isLoadingStats || isLoadingMembers}
               aria-label="Actualizar panel del Dueño"
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#171B25] px-3 text-xs font-medium text-[#D5DCE6] hover:border-white/[0.2] hover:text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <RefreshCw
                 size={14}
-                className={isLoadingStats || isLoadingMembers ? 'animate-spin' : ''}
+                className={
+                  isLoadingStats || isLoadingMembers ? 'animate-spin' : ''
+                }
                 aria-hidden="true"
               />
               <span>Actualizar</span>
@@ -530,39 +596,59 @@ export function ProfileSection({
           {statsError ? (
             <div
               role="alert"
-              className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200"
+              className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-700 dark:text-red-200"
             >
-              <AlertCircle size={15} className="shrink-0 text-red-400" aria-hidden="true" />
+              <AlertCircle
+                size={15}
+                className="shrink-0 text-red-500 dark:text-red-400"
+                aria-hidden="true"
+              />
               <span>{statsError}</span>
             </div>
           ) : (
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
-                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-4 transition-colors duration-300">
+                <div className="flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
                   <span>Usuarios registrados</span>
-                  <Users size={15} className="text-amber-300/80" aria-hidden="true" />
+                  <Users
+                    size={15}
+                    className="text-amber-600 dark:text-amber-300"
+                    aria-hidden="true"
+                  />
                 </div>
-                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
-                  {isLoadingStats && !ownerStats ? '—' : ownerStats?.totalUsers ?? 0}
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-[var(--text-main)]">
+                  {isLoadingStats && !ownerStats
+                    ? '—'
+                    : ownerStats?.totalUsers ?? 0}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
-                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-4 transition-colors duration-300">
+                <div className="flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
                   <span>Publicaciones activas</span>
-                  <FileText size={15} className="text-amber-300/80" aria-hidden="true" />
+                  <FileText
+                    size={15}
+                    className="text-amber-600 dark:text-amber-300"
+                    aria-hidden="true"
+                  />
                 </div>
-                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
-                  {isLoadingStats && !ownerStats ? '—' : ownerStats?.totalPosts ?? 0}
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-[var(--text-main)]">
+                  {isLoadingStats && !ownerStats
+                    ? '—'
+                    : ownerStats?.totalPosts ?? 0}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-white/[0.07] bg-[#0B0E14] px-4 py-4">
-                <div className="flex items-center justify-between text-xs font-medium text-[#8F99AB]">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-4 transition-colors duration-300">
+                <div className="flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
                   <span>Comentarios</span>
-                  <MessageSquare size={15} className="text-amber-300/80" aria-hidden="true" />
+                  <MessageSquare
+                    size={15}
+                    className="text-amber-600 dark:text-amber-300"
+                    aria-hidden="true"
+                  />
                 </div>
-                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-white">
+                <p className="mt-2 font-display text-3xl font-bold tabular-nums text-[var(--text-main)]">
                   {isLoadingStats && !ownerStats
                     ? '—'
                     : ownerStats?.totalComments ?? 0}
@@ -572,15 +658,19 @@ export function ProfileSection({
           )}
 
           {/* Gestión de Miembros e Insignias */}
-          <div className="mt-6 border-t border-white/[0.08] pt-5">
+          <div className="mt-6 border-t border-[var(--border-subtle)] pt-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <Award size={17} className="text-amber-300 shrink-0" aria-hidden="true" />
+                <Award
+                  size={17}
+                  className="text-amber-600 dark:text-amber-300 shrink-0"
+                  aria-hidden="true"
+                />
                 <div>
-                  <h3 className="font-display text-base font-bold text-white">
+                  <h3 className="font-display text-base font-bold text-[var(--text-main)]">
                     Gestión de Miembros e Insignias
                   </h3>
-                  <p className="text-xs text-[#8F99AB]">
+                  <p className="text-xs text-[var(--text-muted)]">
                     Asigna o retira insignias visibles en Actualidad, Comunidad, Biblioteca y Arcade.
                   </p>
                 </div>
@@ -589,7 +679,7 @@ export function ProfileSection({
               <div className="relative w-full sm:w-56">
                 <Search
                   size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6F7B90]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
                   aria-hidden="true"
                 />
                 <input
@@ -598,7 +688,7 @@ export function ProfileSection({
                   onChange={(e) => setMemberSearch(e.target.value)}
                   placeholder="Buscar miembro…"
                   aria-label="Buscar miembro por nombre"
-                  className="min-h-[40px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] pl-8 pr-3 text-xs text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30"
+                  className="min-h-[40px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] pl-8 pr-3 text-xs text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25"
                 />
               </div>
             </div>
@@ -606,9 +696,13 @@ export function ProfileSection({
             {membersError && (
               <div
                 role="alert"
-                className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-700 dark:text-red-200"
               >
-                <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
+                <AlertCircle
+                  size={15}
+                  className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
+                  aria-hidden="true"
+                />
                 <span>{membersError}</span>
               </div>
             )}
@@ -616,9 +710,9 @@ export function ProfileSection({
             <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto pr-1">
               {isLoadingMembers && members.length === 0 ? (
                 <div className="space-y-2 animate-pulse">
-                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
-                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
-                  <div className="h-14 rounded-xl bg-[#0B0E14]" />
+                  <div className="h-14 rounded-xl bg-[var(--bg-subtle)]" />
+                  <div className="h-14 rounded-xl bg-[var(--bg-subtle)]" />
+                  <div className="h-14 rounded-xl bg-[var(--bg-subtle)]" />
                 </div>
               ) : (() => {
                 const query = memberSearch.trim().toLowerCase();
@@ -636,7 +730,7 @@ export function ProfileSection({
 
                 if (filteredMembers.length === 0) {
                   return (
-                    <p className="rounded-xl border border-white/[0.06] bg-[#0B0E14] px-4 py-6 text-center text-xs text-[#8F99AB]">
+                    <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-6 text-center text-xs text-[var(--text-muted)]">
                       {query
                         ? 'No se encontraron usuarios con ese criterio.'
                         : 'Aún no hay miembros registrados.'}
@@ -654,7 +748,7 @@ export function ProfileSection({
                   return (
                     <div
                       key={member.id}
-                      className="flex flex-col gap-3 rounded-xl border border-white/[0.07] bg-[#0B0E14] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between transition-colors duration-300"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar
@@ -664,11 +758,11 @@ export function ProfileSection({
                         />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate text-sm font-semibold text-white">
+                            <span className="truncate text-sm font-semibold text-[var(--text-main)]">
                               {displayName}
                             </span>
                             {member.id === user.id && (
-                              <span className="text-[11px] font-medium text-[#7FB2FF]">
+                              <span className="text-[11px] font-semibold text-[var(--accent-primary)]">
                                 (Tú)
                               </span>
                             )}
@@ -678,7 +772,7 @@ export function ProfileSection({
                               size="xs"
                             />
                           </div>
-                          <p className="mt-0.5 text-[11px] text-[#738096] tabular-nums">
+                          <p className="mt-0.5 text-[11px] text-[var(--text-muted)] tabular-nums">
                             ID: {member.id.slice(0, 8)}…
                           </p>
                         </div>
@@ -688,17 +782,20 @@ export function ProfileSection({
                         {isBusy && (
                           <Loader2
                             size={15}
-                            className="animate-spin text-[#7FB2FF]"
+                            className="animate-spin text-[var(--accent-primary)]"
                             aria-label="Guardando insignia"
                           />
                         )}
                         {isJustSaved && !isBusy && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-300">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-300">
                             <Check size={13} aria-hidden="true" />
                             <span>Guardado</span>
                           </span>
                         )}
-                        <label htmlFor={`badge-select-${member.id}`} className="sr-only">
+                        <label
+                          htmlFor={`badge-select-${member.id}`}
+                          className="sr-only"
+                        >
                           Insignia para {displayName}
                         </label>
                         <select
@@ -711,7 +808,7 @@ export function ProfileSection({
                               event.target.value
                             )
                           }
-                          className="min-h-[40px] rounded-xl border border-white/[0.12] bg-[#141925] px-3 text-xs font-medium text-[#E5ECF5] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 disabled:opacity-50"
+                          className="min-h-[40px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-main)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 disabled:opacity-50"
                         >
                           <option value="">Ninguna</option>
                           {MEMBER_BADGE_OPTIONS.map((option) => (
@@ -733,7 +830,7 @@ export function ProfileSection({
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Columna izquierda: Foto de perfil e identidad de cuenta */}
         <div className="lg:col-span-4">
-          <div className="rounded-2xl border border-white/[0.08] bg-[#11151D] p-6">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 shadow-sm transition-colors duration-300">
             <div className="flex flex-col items-center text-center">
               <div className="relative">
                 <Avatar
@@ -746,7 +843,7 @@ export function ProfileSection({
                   <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/65">
                     <Loader2
                       size={24}
-                      className="animate-spin text-[#529BFF]"
+                      className="animate-spin text-white"
                       aria-label="Subiendo foto"
                     />
                   </div>
@@ -754,13 +851,13 @@ export function ProfileSection({
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2 max-w-full">
-                <h2 className="font-display text-lg font-semibold text-white max-w-full truncate">
+                <h2 className="font-display text-lg font-semibold text-[var(--text-main)] max-w-full truncate">
                   {username.trim() || 'Sin nombre de usuario'}
                 </h2>
                 <OwnerBadge role={profile?.role} badge={profile?.badge} size="sm" />
               </div>
 
-              <p className="mt-1 text-xs text-[#8B95A5] max-w-full truncate">
+              <p className="mt-1 text-xs text-[var(--text-muted)] max-w-full truncate">
                 {user.email}
               </p>
 
@@ -777,7 +874,7 @@ export function ProfileSection({
                 type="button"
                 disabled={isUploadingAvatar || isLoadingProfile}
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-5 min-h-[44px] w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-[#171C27] px-4 py-2.5 text-sm font-medium text-[#EEF2F7] hover:bg-[#1E2533] disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                className="mt-5 min-h-[44px] w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
                 {isUploadingAvatar ? (
                   <>
@@ -792,7 +889,7 @@ export function ProfileSection({
                 )}
               </button>
 
-              <p className="mt-3 text-xs text-[#7B8597]">
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
                 JPG, PNG, WebP o GIF · Máx. 5 MB
               </p>
             </div>
@@ -803,20 +900,20 @@ export function ProfileSection({
         <div className="lg:col-span-8">
           <form
             onSubmit={handleSaveProfile}
-            className="rounded-2xl border border-white/[0.08] bg-[#11151D] p-6 sm:p-7"
+            className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 sm:p-7 shadow-sm transition-colors duration-300"
           >
             {isLoadingProfile ? (
               <div className="space-y-5 animate-pulse">
-                <div className="h-12 w-full rounded-xl bg-[#181D27]" />
-                <div className="h-32 w-full rounded-xl bg-[#181D27]" />
-                <div className="h-12 w-40 rounded-xl bg-[#181D27]" />
+                <div className="h-12 w-full rounded-xl bg-[var(--bg-elevated)]" />
+                <div className="h-32 w-full rounded-xl bg-[var(--bg-elevated)]" />
+                <div className="h-12 w-40 rounded-xl bg-[var(--bg-elevated)]" />
               </div>
             ) : (
               <div className="space-y-6">
                 <div>
                   <label
                     htmlFor="profile-username"
-                    className="mb-2 block text-sm font-medium text-[#D5DCE6]"
+                    className="mb-2 block text-sm font-medium text-[var(--text-main)]"
                   >
                     Nombre de usuario
                   </label>
@@ -827,9 +924,9 @@ export function ProfileSection({
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     placeholder="Ej. lucia_lectora"
-                    className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                    className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors duration-300"
                   />
-                  <p className="mt-1.5 text-xs text-[#7B8597]">
+                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
                     Así aparecerás en la plataforma.
                   </p>
                 </div>
@@ -838,11 +935,11 @@ export function ProfileSection({
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <label
                       htmlFor="profile-bio"
-                      className="block text-sm font-medium text-[#D5DCE6]"
+                      className="block text-sm font-medium text-[var(--text-main)]"
                     >
                       Biografía
                     </label>
-                    <span className="text-xs tabular-nums text-[#7B8597]">
+                    <span className="text-xs tabular-nums text-[var(--text-muted)]">
                       {bio.length} / {MAX_BIO_LENGTH}
                     </span>
                   </div>
@@ -853,7 +950,7 @@ export function ProfileSection({
                     value={bio}
                     onChange={(event) => setBio(event.target.value)}
                     placeholder="Cuéntanos brevemente sobre ti, tus temas favoritos o qué te gusta leer…"
-                    className="w-full resize-none rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 py-3 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                    className="w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors duration-300"
                   />
                 </div>
 
@@ -862,20 +959,20 @@ export function ProfileSection({
                     role={feedback.type === 'error' ? 'alert' : 'status'}
                     className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${
                       feedback.type === 'error'
-                        ? 'border-red-500/30 bg-red-500/10 text-red-200'
-                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                        ? 'border-red-500/35 bg-red-500/12 text-red-700 dark:text-red-200'
+                        : 'border-emerald-500/35 bg-emerald-500/12 text-emerald-700 dark:text-emerald-200'
                     }`}
                   >
                     {feedback.type === 'error' ? (
                       <AlertCircle
                         size={18}
-                        className="mt-0.5 shrink-0 text-red-400"
+                        className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
                         aria-hidden="true"
                       />
                     ) : (
                       <CheckCircle2
                         size={18}
-                        className="mt-0.5 shrink-0 text-emerald-400"
+                        className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                         aria-hidden="true"
                       />
                     )}
@@ -886,8 +983,12 @@ export function ProfileSection({
                 <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-end">
                   <button
                     type="submit"
-                    disabled={isSaving || isUploadingAvatar || (!hasUnsavedChanges && profileExists)}
-                    className="min-h-[48px] w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-6 py-3 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#11151D]"
+                    disabled={
+                      isSaving ||
+                      isUploadingAvatar ||
+                      (!hasUnsavedChanges && profileExists)
+                    }
+                    className="min-h-[48px] w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-6 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]"
                   >
                     {isSaving ? (
                       <>

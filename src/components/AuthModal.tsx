@@ -139,22 +139,22 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         }
       }}
     >
-      <div className="w-full max-w-md rounded-t-3xl border border-white/[0.1] bg-[#11151D] p-6 pb-8 shadow-2xl sm:rounded-2xl sm:p-7">
+      <div className="w-full max-w-md rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 pb-8 shadow-2xl transition-colors duration-300 sm:rounded-2xl sm:p-7">
         {/* Indicador táctil móvil */}
         <div
           aria-hidden="true"
-          className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-white/[0.14] sm:hidden"
+          className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden"
         />
 
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2
               id="auth-modal-title"
-              className="font-display text-2xl font-bold tracking-tight text-white"
+              className="font-display text-2xl font-bold tracking-tight text-[var(--text-main)]"
             >
               {tab === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
             </h2>
-            <p className="mt-1 text-sm text-[#97A1B2]">
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
               {tab === 'login'
                 ? 'Accede a tu cuenta de Trama con tu correo y contraseña.'
                 : 'Regístrate para configurar tu perfil y guardar tus preferencias.'}
@@ -166,21 +166,21 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
             onClick={onClose}
             disabled={isSubmitting}
             aria-label="Cerrar formulario"
-            className="min-h-[44px] min-w-[44px] -mr-2 -mt-2 flex items-center justify-center rounded-xl text-[#97A1B2] hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+            className="min-h-[44px] min-w-[44px] -mr-2 -mt-2 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
           >
             <X size={20} aria-hidden="true" />
           </button>
         </div>
 
         {/* Selector de pestaña Iniciar sesión / Registrarse */}
-        <div className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-[#0B0E14] p-1 border border-white/[0.07]">
+        <div className="mt-6 grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
           <button
             type="button"
             onClick={() => setTab('login')}
-            className={`min-h-[40px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+            className={`min-h-[40px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
               tab === 'login'
-                ? 'bg-[#1D2330] text-white'
-                : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
             }`}
           >
             Iniciar sesión
@@ -188,10 +188,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           <button
             type="button"
             onClick={() => setTab('register')}
-            className={`min-h-[40px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+            className={`min-h-[40px] rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
               tab === 'register'
-                ? 'bg-[#1D2330] text-white'
-                : 'text-[#8B95A5] hover:text-[#E2E7F0]'
+                ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
             }`}
           >
             Registrarse
@@ -202,7 +202,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           <div>
             <label
               htmlFor="auth-email"
-              className="mb-1.5 block text-sm font-medium text-[#D5DCE6]"
+              className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
             >
               Correo electrónico
             </label>
@@ -214,14 +214,14 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="tu@correo.com"
-              className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
 
           <div>
             <label
               htmlFor="auth-password"
-              className="mb-1.5 block text-sm font-medium text-[#D5DCE6]"
+              className="mb-1.5 block text-sm font-medium text-[var(--text-main)]"
             >
               Contraseña
             </label>
@@ -235,13 +235,13 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="min-h-[46px] w-full rounded-xl border border-white/[0.1] bg-[#0B0E14] pl-3.5 pr-12 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="min-h-[46px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] pl-3.5 pr-12 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                className="absolute right-0.5 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#8B95A5] hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
                 {showPassword ? (
                   <EyeOff size={18} aria-hidden="true" />
@@ -255,9 +255,9 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           {errorMsg && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-200"
+              className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-700 dark:text-red-200"
             >
-              <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
+              <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-500 dark:text-red-400" aria-hidden="true" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -265,11 +265,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           {infoMsg && (
             <div
               role="status"
-              className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-3 text-sm text-emerald-200"
+              className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-3 text-sm text-emerald-700 dark:text-emerald-200"
             >
               <CheckCircle2
                 size={18}
-                className="mt-0.5 shrink-0 text-emerald-400"
+                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                 aria-hidden="true"
               />
               <span>{infoMsg}</span>
@@ -279,7 +279,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 min-h-[48px] w-full flex items-center justify-center gap-2 rounded-xl bg-[#388BFF] px-4 py-3 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#11151D]"
+            className="mt-2 min-h-[48px] w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-3 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]"
           >
             {isSubmitting ? (
               <>

@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, bio, avatar_url, role, badge')
+        .select('id, username, bio, avatar_url, role, badge, theme_mode, accent_color, font_size')
         .eq('id', userId)
         .maybeSingle();
 
@@ -53,6 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: null,
           role: null,
           badge: null,
+          theme_mode: null,
+          accent_color: null,
+          font_size: null,
         });
         setProfileExists(false);
         return;
@@ -66,6 +69,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: data.avatar_url ?? null,
           role: data.role ?? null,
           badge: data.badge ?? null,
+          theme_mode:
+            data.theme_mode === 'light' || data.theme_mode === 'dark'
+              ? data.theme_mode
+              : null,
+          accent_color:
+            data.accent_color === 'violet' || data.accent_color === 'blue'
+              ? data.accent_color
+              : null,
+          font_size:
+            data.font_size === 'large' ||
+            data.font_size === 'xl' ||
+            data.font_size === 'normal'
+              ? data.font_size
+              : null,
         });
         setProfileExists(true);
       } else {
@@ -76,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: null,
           role: null,
           badge: null,
+          theme_mode: null,
+          accent_color: null,
+          font_size: null,
         });
         setProfileExists(false);
       }
@@ -88,6 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar_url: null,
         role: null,
         badge: null,
+        theme_mode: null,
+        accent_color: null,
+        font_size: null,
       });
       setProfileExists(false);
     } finally {

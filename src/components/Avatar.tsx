@@ -50,7 +50,7 @@ export function Avatar({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-full bg-[#191E28] border border-white/[0.1] flex items-center justify-center font-semibold text-[#CBD5E1] select-none ${SIZE_CLASSES[size]} ${className}`}
+      className={`relative shrink-0 overflow-hidden rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center font-semibold text-[var(--text-secondary)] select-none transition-colors duration-300 ${SIZE_CLASSES[size]} ${className}`}
     >
       {validUrl ? (
         <img
@@ -63,7 +63,7 @@ export function Avatar({
       ) : initials ? (
         <span aria-hidden="true">{initials}</span>
       ) : (
-        <User size={ICON_SIZES[size]} className="text-[#8B95A5]" aria-hidden="true" />
+        <User size={ICON_SIZES[size]} className="text-[var(--text-muted)]" aria-hidden="true" />
       )}
     </div>
   );

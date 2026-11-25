@@ -7,6 +7,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import {
   formatChapterNumber,
   getNovelReaderPrefs,
@@ -54,15 +55,16 @@ const NOVEL_THEME_STYLES: Record<
   }
 > = {
   oscuro: {
-    page: 'bg-[#090B0E] text-[#E6EBF3]',
-    header: 'bg-[#0D1017]/95 border-white/[0.08] text-[#F2F4F8]',
-    title: 'text-white',
-    body: 'text-[#DCE2EC]',
-    muted: 'text-[#8F99AB]',
+    page: 'bg-[#0F1115] text-[#F3F4F6]',
+    header: 'bg-[#161920]/95 border-[#262B36] text-[#F3F4F6]',
+    title: 'text-[#F3F4F6]',
+    body: 'text-[#E2E8F0]',
+    muted: 'text-[#9CA3AF]',
     button:
-      'border-white/[0.12] bg-[#141923] text-[#E6EBF3] hover:bg-[#1C2331]',
-    activeChip: 'bg-[#388BFF] text-[#06101F] font-semibold',
-    divider: 'border-white/[0.08]',
+      'border-[#262B36] bg-[#161920] text-[#F3F4F6] hover:bg-[#1E232D]',
+    activeChip:
+      'bg-[var(--accent-primary)] text-[var(--accent-fg)] font-semibold',
+    divider: 'border-[#262B36]',
   },
   sepia: {
     page: 'bg-[#F4ECD8] text-[#2F2418]',
@@ -76,15 +78,16 @@ const NOVEL_THEME_STYLES: Record<
     divider: 'border-[#D8C9A8]',
   },
   claro: {
-    page: 'bg-[#FAFAF9] text-[#18181B]',
-    header: 'bg-white/95 border-[#E4E4E7] text-[#18181B]',
-    title: 'text-[#09090B]',
-    body: 'text-[#27272A]',
-    muted: 'text-[#52525B]',
+    page: 'bg-[#F8FAFC] text-[#0F172A]',
+    header: 'bg-white/95 border-[#E2E8F0] text-[#0F172A]',
+    title: 'text-[#0F172A]',
+    body: 'text-[#1E293B]',
+    muted: 'text-[#475569]',
     button:
-      'border-[#D4D4D8] bg-white text-[#18181B] hover:bg-[#F4F4F5]',
-    activeChip: 'bg-[#18181B] text-white font-semibold',
-    divider: 'border-[#E4E4E7]',
+      'border-[#E2E8F0] bg-white text-[#0F172A] hover:bg-[#F1F5F9]',
+    activeChip:
+      'bg-[var(--accent-primary)] text-[var(--accent-fg)] font-semibold',
+    divider: 'border-[#E2E8F0]',
   },
 };
 
@@ -124,13 +127,32 @@ export function ChapterReaderView({
   onChangeChapterIndex,
   onBackToSeries,
 }: ChapterReaderViewProps) {
+  const { themeMode, fontSizePx } = useTheme();
   const currentChapter = chapters[chapterIndex];
   const prevChapter = chapterIndex > 0 ? chapters[chapterIndex - 1] : null;
   const nextChapter =
     chapterIndex < chapters.length - 1 ? chapters[chapterIndex + 1] : null;
 
-  const [novelPrefs, setNovelPrefs] = useState(() => getNovelReaderPrefs());
+  const [novelPrefs, setNovelPrefs] = useState(() => {
+    const saved = getNovelReaderPrefs();
+    return {
+      fontSize: fontSizePx || saved.fontSize,
+      theme:
+        saved.theme === 'sepia'
+          ? 'sepia'
+          : themeMode === 'light'
+            ? 'claro'
+            : 'oscuro',
+    } as { fontSize: number; theme: NovelReaderTheme };
+  });
   const [showManhwaHud, setShowManhwaHud] = useState(true);
+
+  useEffect(() => {
+    setNovelPrefs((prev) => ({
+      ...prev,
+      fontSize: fontSizePx,
+    }));
+  }, [fontSizePx]);
 
   useEffect(() => {
     if (!currentChapter) return;
@@ -163,12 +185,12 @@ export function ChapterReaderView({
 
   if (!currentChapter) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#090B0E] px-6 text-center text-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--bg-base)] px-6 text-center text-[var(--text-main)] transition-colors duration-300">
         <p className="text-base font-medium">Capítulo no disponible.</p>
         <button
           type="button"
           onClick={onBackToSeries}
-          className="mt-4 min-h-[44px] rounded-xl bg-[#388BFF] px-4 py-2 text-sm font-semibold text-[#06101F]"
+          className="mt-4 min-h-[44px] rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)]"
         >
           Volver a la obra
         </button>

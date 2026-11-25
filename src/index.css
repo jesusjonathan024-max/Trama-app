@@ -6,20 +6,98 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Trama Light (por defecto cuando no tiene clase .dark) */
+:root {
+  color-scheme: light;
+  --bg-base: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --bg-subtle: #eef2f7;
+  --border-subtle: #e2e8f0;
+  --text-main: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  /* Acento Azul en Trama Light */
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-border: rgba(37, 99, 235, 0.32);
+  --accent-fg: #ffffff;
+
+  /* Tamaño de lectura dinámico */
+  --reading-font-size: 16px;
+}
+
+:root[data-accent="violet"] {
+  --accent-primary: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.1);
+  --accent-border: rgba(124, 58, 237, 0.34);
+  --accent-fg: #ffffff;
+}
+
+/* Trama Dark (tema por defecto de la aplicación) */
+:root.dark {
+  color-scheme: dark;
+  --bg-base: #0f1115;
+  --bg-card: #161920;
+  --bg-elevated: #1e232d;
+  --bg-subtle: #12151c;
+  --border-subtle: #262b36;
+  --text-main: #f3f4f6;
+  --text-secondary: #a1a9b8;
+  --text-muted: #7c8596;
+
+  /* Acento Azul en Trama Dark */
+  --accent-primary: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.15);
+  --accent-border: rgba(59, 130, 246, 0.4);
+  --accent-fg: #ffffff;
+}
+
+:root.dark[data-accent="violet"] {
+  --accent-primary: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --accent-soft: rgba(139, 92, 246, 0.16);
+  --accent-border: rgba(139, 92, 246, 0.42);
+  --accent-fg: #ffffff;
+}
+
+/* Escala tipográfica de lectura (Normal 16px, Grande 18px, Lectura XL 20px) */
+:root[data-font-size="normal"] {
+  --reading-font-size: 16px;
+}
+
+:root[data-font-size="large"] {
+  --reading-font-size: 18px;
+}
+
+:root[data-font-size="xl"] {
+  --reading-font-size: 20px;
+}
+
 @layer base {
   html {
     font-family: var(--font-sans);
-    color-scheme: dark;
-    background-color: #090b0e;
-    color: #f2f4f8;
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    transition: background-color 300ms ease, color 300ms ease;
   }
 
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: #090b0e;
-    color: #f2f4f8;
+    background-color: var(--bg-base);
+    color: var(--text-main);
     letter-spacing: 0.008em;
+    transition: background-color 300ms ease, color 300ms ease;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--text-main);
   }
 
   h1,
@@ -27,6 +105,16 @@
   h3 {
     font-family: var(--font-display);
   }
+}
+
+.reading-prose {
+  font-size: var(--reading-font-size);
+  line-height: 1.75;
+}
+
+.reading-prose-compact {
+  font-size: calc(var(--reading-font-size) * 0.94);
+  line-height: 1.65;
 }
 
 .pb-safe {

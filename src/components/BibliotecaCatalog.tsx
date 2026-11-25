@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   BookOpen,
+  ChevronRight,
   Plus,
   Search,
   X,
@@ -12,9 +13,10 @@ import {
   type SeriesRecord,
   type SeriesType,
 } from '../lib/library';
+import { getAuthorDisplayName } from '../lib/posts';
+import { Avatar } from './Avatar';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
-import { getAuthorDisplayName } from '../lib/posts';
 
 export type BibliotecaFilter = 'todas' | SeriesType;
 
@@ -94,19 +96,19 @@ export function BibliotecaCatalog({
   return (
     <section
       aria-labelledby="biblioteca-heading"
-      className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-6 md:px-8 md:py-10 md:pb-20"
+      className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-6 md:px-8 md:py-10 md:pb-20"
     >
       {/* Cabecera de Biblioteca + botón "+ Nueva Obra" */}
-      <div className="border-b border-white/[0.08] pb-5">
+      <div className="border-b border-[var(--border-subtle)] pb-5 transition-colors duration-300">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1
               id="biblioteca-heading"
-              className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl"
+              className="font-display text-3xl font-bold tracking-tight text-[var(--text-main)] sm:text-4xl"
             >
               Biblioteca
             </h1>
-            <p className="mt-1 text-sm text-[#8F99AB]">
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
               Catálogo de novelas web y manhwas por capítulos.
             </p>
           </div>
@@ -115,7 +117,7 @@ export function BibliotecaCatalog({
             <button
               type="button"
               onClick={onOpenCreateSeries}
-              className="min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl bg-[#388BFF] px-4 py-2.5 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] active:scale-[0.98] transition-all duration-150 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+              className="min-h-[44px] self-start sm:self-auto inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
               <span>Nueva Obra</span>
@@ -139,10 +141,10 @@ export function BibliotecaCatalog({
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => onSelectFilter(tab.id)}
-                  className={`min-h-[42px] rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] ${
+                  className={`min-h-[42px] rounded-xl border px-4 py-2 text-sm font-medium transition-colors duration-300 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
                     isActive
-                      ? 'bg-[#1D2432] text-white border border-white/[0.12]'
-                      : 'text-[#8F99AB] border border-transparent hover:bg-white/[0.04] hover:text-[#E5E9F0]'
+                      ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold'
+                      : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
                   }`}
                 >
                   {tab.label}
@@ -154,7 +156,7 @@ export function BibliotecaCatalog({
           <div className="relative w-full md:max-w-xs">
             <Search
               size={16}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7D8799]"
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
               aria-hidden="true"
             />
             <label htmlFor="biblioteca-search" className="sr-only">
@@ -166,14 +168,14 @@ export function BibliotecaCatalog({
               value={searchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
               placeholder="Buscar por título…"
-              className="min-h-[44px] w-full rounded-xl border border-white/[0.1] bg-[#11151D] pl-10 pr-10 text-sm text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+              className="min-h-[44px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] pl-10 pr-10 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors duration-300"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => onSearchQueryChange('')}
                 aria-label="Limpiar búsqueda"
-                className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-[#8F99AB] hover:text-white transition-colors"
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
               >
                 <X size={15} aria-hidden="true" />
               </button>
@@ -184,38 +186,47 @@ export function BibliotecaCatalog({
 
       {/* Estados del catálogo */}
       {isLoading ? (
-        <div className="mt-7 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4 animate-pulse">
+        <div className="mt-7 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 animate-pulse">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
-            <div key={item} className="space-y-2.5">
-              <div className="aspect-[3/4] w-full rounded-2xl bg-[#131720] border border-white/[0.06]" />
-              <div className="h-4 w-4/5 rounded bg-[#181E2B]" />
-              <div className="h-3 w-1/2 rounded bg-[#141924]" />
+            <div
+              key={item}
+              className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]"
+            >
+              <div className="aspect-[3/4] w-full bg-[var(--bg-elevated)]" />
+              <div className="p-3.5 space-y-2.5">
+                <div className="h-4 w-4/5 rounded bg-[var(--bg-elevated)]" />
+                <div className="h-3 w-1/2 rounded bg-[var(--bg-subtle)]" />
+              </div>
             </div>
           ))}
         </div>
       ) : errorMsg ? (
         <div
           role="alert"
-          className="mt-8 flex flex-col gap-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-200 sm:flex-row sm:items-center sm:justify-between"
+          className="mt-8 flex flex-col gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-700 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-2.5">
-            <AlertCircle size={18} className="shrink-0 text-red-400" aria-hidden="true" />
+            <AlertCircle
+              size={18}
+              className="shrink-0 text-red-500 dark:text-red-400"
+              aria-hidden="true"
+            />
             <span>{errorMsg}</span>
           </div>
           <button
             type="button"
             onClick={() => void loadCatalog()}
-            className="min-h-[40px] self-start sm:self-auto rounded-xl bg-white/[0.1] px-4 text-xs font-semibold text-white hover:bg-white/[0.16] transition-colors"
+            className="min-h-[40px] self-start sm:self-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
           >
             Reintentar
           </button>
         </div>
       ) : filteredSeries.length === 0 ? (
-        <div className="mx-auto mt-14 flex max-w-md flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#10141C] px-6 py-14 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#161C27] text-[#7FB2FF]">
+        <div className="mx-auto mt-14 flex max-w-md flex-col items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-14 text-center transition-colors duration-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
             <BookOpen size={22} aria-hidden="true" />
           </div>
-          <h2 className="mt-4 font-display text-xl font-semibold text-white">
+          <h2 className="mt-4 font-display text-xl font-semibold text-[var(--text-main)]">
             {searchQuery.trim()
               ? 'No encontramos obras con ese título'
               : selectedFilter === 'todas'
@@ -224,7 +235,7 @@ export function BibliotecaCatalog({
                   ? 'Todavía no hay novelas registradas'
                   : 'Todavía no hay manhwas registrados'}
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#8F99AB]">
+          <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
             {searchQuery.trim()
               ? 'Prueba con otra palabra o limpia el buscador para ver todo el catálogo.'
               : 'Sé la primera persona en registrar una obra y subir sus primeros capítulos.'}
@@ -237,7 +248,7 @@ export function BibliotecaCatalog({
                   onSearchQueryChange('');
                   onSelectFilter('todas');
                 }}
-                className="min-h-[44px] rounded-xl border border-white/[0.12] px-4 py-2 text-sm font-medium text-[#E2E7F0] hover:bg-white/[0.05] transition-colors"
+                className="min-h-[44px] rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 Ver todo el catálogo
               </button>
@@ -246,7 +257,7 @@ export function BibliotecaCatalog({
               <button
                 type="button"
                 onClick={onOpenCreateSeries}
-                className="min-h-[44px] inline-flex items-center gap-2 rounded-xl bg-[#388BFF] px-4 py-2 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] transition-colors"
+                className="min-h-[44px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] transition-colors"
               >
                 <Plus size={16} aria-hidden="true" />
                 <span>Nueva Obra</span>
@@ -255,7 +266,7 @@ export function BibliotecaCatalog({
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="min-h-[44px] rounded-xl bg-[#388BFF] px-4 py-2 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] transition-colors"
+                className="min-h-[44px] rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] transition-colors"
               >
                 Iniciar sesión para publicar
               </button>
@@ -263,7 +274,7 @@ export function BibliotecaCatalog({
           </div>
         </div>
       ) : (
-        <div className="mt-7 grid grid-cols-2 gap-3.5 sm:gap-5 md:grid-cols-4">
+        <div className="mt-7 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
           {filteredSeries.map((series) => {
             const isManhwa = series.type === 'manhwa';
             return (
@@ -271,10 +282,10 @@ export function BibliotecaCatalog({
                 key={series.id}
                 type="button"
                 onClick={() => onSelectSeries(series)}
-                className="group flex flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] rounded-2xl"
+                className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left shadow-sm hover:border-[var(--accent-border)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
-                {/* Portada vertical 3:4 estilo Olympus / Novelive */}
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#131720] transition-colors duration-150 group-hover:border-white/[0.2]">
+                {/* Portada vertical 3:4 */}
+                <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--bg-subtle)]">
                   {series.cover_url ? (
                     <MediaImage
                       src={series.cover_url}
@@ -301,25 +312,23 @@ export function BibliotecaCatalog({
                   {/* Scrim inferior medido para alto contraste */}
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/45 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/85 via-black/40 to-transparent"
                   />
 
-                  {/* Etiqueta de color indicando Novela o Manhwa */}
                   <span
-                    className={`absolute left-2.5 top-2.5 rounded-lg px-2 py-1 text-[11px] font-semibold tracking-wide backdrop-blur-sm ${
+                    className={`absolute left-2.5 top-2.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-wide backdrop-blur-sm ${
                       isManhwa
-                        ? 'bg-[#B45309]/90 text-[#FEF3C7]'
-                        : 'bg-[#1D4ED8]/90 text-[#DBEAFE]'
+                        ? 'bg-[#B45309]/92 text-[#FEF3C7]'
+                        : 'bg-[#1D4ED8]/92 text-[#DBEAFE]'
                     }`}
                   >
                     {isManhwa ? 'Manhwa' : 'Novela'}
                   </span>
 
-                  {/* Estado sobre el borde inferior */}
-                  <div className="absolute inset-x-3 bottom-2.5 flex items-center justify-between gap-2 text-[11px] font-medium text-white/90">
+                  <div className="absolute inset-x-2.5 bottom-2 flex items-center justify-between gap-2 text-[11px] font-medium text-white/95">
                     <span className="truncate">{series.status}</span>
                     {series.chapters_count > 0 && (
-                      <span className="shrink-0 tabular-nums text-white/75">
+                      <span className="shrink-0 tabular-nums text-white/80">
                         {series.chapters_count}{' '}
                         {series.chapters_count === 1 ? 'cap.' : 'caps.'}
                       </span>
@@ -327,19 +336,35 @@ export function BibliotecaCatalog({
                   </div>
                 </div>
 
-                {/* Título, género y autor debajo de la portada */}
-                <div className="mt-2.5 px-0.5">
-                  <h2 className="line-clamp-2 font-display text-[15px] font-semibold leading-snug text-[#F3F5FA] group-hover:text-[#9CC6FF] transition-colors sm:text-base">
-                    {series.title}
-                  </h2>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[#838D9F]">
-                    <span className="truncate">{series.genre}</span>
-                    {series.author && (
-                      <>
-                        <span aria-hidden="true" className="text-[#566072]">
-                          ·
-                        </span>
-                        <span className="truncate max-w-[110px]">
+                {/* ZONA 1 + 2: Cabecera de autor/género y Cuerpo de título/extracto */}
+                <div className="flex flex-1 flex-col justify-between p-3.5">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--accent-primary)]">
+                      <span className="truncate">{series.genre}</span>
+                    </div>
+
+                    <h2 className="mt-1 line-clamp-2 font-display text-[15px] font-bold leading-snug text-[var(--text-main)] group-hover:text-[var(--accent-primary)] transition-colors duration-300 sm:text-base">
+                      {series.title}
+                    </h2>
+
+                    {series.synopsis && (
+                      <p className="mt-1.5 hidden sm:line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        {series.synopsis}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ZONA 3: Pie con autor, insignia y flecha */}
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5 transition-colors duration-300">
+                    {series.author ? (
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <Avatar
+                          src={series.author.avatar_url}
+                          name={series.author.username}
+                          size="sm"
+                          className="!h-5 !w-5 !text-[9px]"
+                        />
+                        <span className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
                           {getAuthorDisplayName(series.author)}
                         </span>
                         <OwnerBadge
@@ -347,8 +372,17 @@ export function BibliotecaCatalog({
                           badge={series.author.badge}
                           size="xs"
                         />
-                      </>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        Biblioteca Trama
+                      </span>
                     )}
+                    <ChevronRight
+                      size={14}
+                      className="shrink-0 text-[var(--text-muted)] group-hover:text-[var(--accent-primary)] transition-colors"
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
               </button>

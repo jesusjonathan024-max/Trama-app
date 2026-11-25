@@ -30,6 +30,10 @@ export const MEMBER_BADGE_OPTIONS = [
 
 export type MemberBadge = (typeof MEMBER_BADGE_OPTIONS)[number];
 
+export type ThemeMode = 'dark' | 'light';
+export type AccentColor = 'blue' | 'violet';
+export type FontSizeOption = 'normal' | 'large' | 'xl';
+
 export interface UserProfile {
   id: string;
   username: string | null;
@@ -37,6 +41,9 @@ export interface UserProfile {
   avatar_url: string | null;
   role: string | null;
   badge: string | null;
+  theme_mode?: ThemeMode | null;
+  accent_color?: AccentColor | null;
+  font_size?: FontSizeOption | null;
 }
 
 export function isOwnerRole(role: string | null | undefined): boolean {

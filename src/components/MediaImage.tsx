@@ -30,7 +30,7 @@ export function MediaImage({
       <div
         role="img"
         aria-label={alt}
-        className={`flex flex-col items-center justify-center gap-2 bg-[#141923] border border-white/[0.08] text-[#7D8799] ${fallbackClassName || className}`}
+        className={`flex flex-col items-center justify-center gap-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] transition-colors duration-300 ${fallbackClassName || className}`}
       >
         <ImageOff size={22} aria-hidden="true" />
         <span className="text-xs">Imagen no disponible</span>

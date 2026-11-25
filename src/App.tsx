@@ -17,9 +17,15 @@ import { PostDetailView } from './components/PostDetailView';
 import { ProfileSection } from './components/ProfileSection';
 import { SeriesDetailView } from './components/SeriesDetailView';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import type { AiChatContext } from './lib/ai';
 import type { ChapterRecord, SeriesRecord } from './lib/library';
-import { getAuthorDisplayName, type PostMode, type PostRecord } from './lib/posts';
+import {
+  fetchPostById,
+  getAuthorDisplayName,
+  type PostMode,
+  type PostRecord,
+} from './lib/posts';
 
 interface ActiveReaderState {
   series: SeriesRecord;
@@ -28,7 +34,7 @@ interface ActiveReaderState {
 }
 
 function AppShell() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const [activeView, setActiveView] = useState<ActiveView>('actualidad');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -91,6 +97,31 @@ function AppShell() {
     setActiveView(view);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
+
+  const handleOpenGlobalCreate = useCallback(() => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsCreatePostModalOpen(true);
+  }, [isAuthenticated]);
+
+  const handleOpenNotificationPost = useCallback(
+    async (postId: string) => {
+      try {
+        const post = await fetchPostById(postId, user?.id);
+        if (!post) return;
+        setSelectedSeries(null);
+        setActiveReader(null);
+        setActiveView(post.mode);
+        setSelectedPost(post);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      } catch {
+        // Ignora si la publicación ya fue eliminada
+      }
+    },
+    [user?.id]
+  );
 
   const handleSelectPost = useCallback((post: PostRecord) => {
     setSelectedPost(post);
@@ -189,11 +220,13 @@ function AppShell() {
     (activeView === 'actualidad' || activeView === 'comunidad');
 
   return (
-    <div className="min-h-dvh bg-[#090B0E] text-[#F2F4F8] flex flex-col">
+    <div className="min-h-dvh bg-[var(--bg-base)] text-[var(--text-main)] flex flex-col transition-colors duration-300">
       <Navbar
         activeView={activeView}
         onSelectView={handleSelectView}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenCreate={handleOpenGlobalCreate}
+        onOpenNotificationPost={(postId) => void handleOpenNotificationPost(postId)}
       />
 
       <main className="flex-1">
@@ -260,16 +293,16 @@ function AppShell() {
         )}
       </main>
 
-      {/* Botón flotante "+" para Actualidad y Comunidad cuando el usuario inició sesión */}
+      {/* Botón flotante "+" ubicado abajo a la izquierda para no cruzarse nunca con el sello inferior derecho de Netlify */}
       {showFloatingCreatePostButton && (
         <button
           type="button"
           onClick={() => setIsCreatePostModalOpen(true)}
           aria-label="Crear publicación"
           title="Crear publicación"
-          className="fixed bottom-16 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#388BFF] text-[#06101F] shadow-lg shadow-[#388BFF]/25 hover:bg-[#529BFF] active:scale-95 transition-all duration-150 md:bottom-16 md:right-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#090B0E]"
+          className="fixed bottom-5 left-4 z-30 flex h-13 w-13 items-center justify-center rounded-2xl bg-[var(--accent-primary)] text-[var(--accent-fg)] shadow-lg hover:bg-[var(--accent-hover)] active:scale-95 transition-all duration-300 md:bottom-6 md:left-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
         >
-          <Plus size={26} strokeWidth={2.4} aria-hidden="true" />
+          <Plus size={24} strokeWidth={2.4} aria-hidden="true" />
         </button>
       )}
 
@@ -306,7 +339,9 @@ function AppShell() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <ThemeProvider>
+        <AppShell />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

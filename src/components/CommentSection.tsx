@@ -70,13 +70,12 @@ function CommentItem({
   );
   const authorName = getAuthorDisplayName(node.author);
 
-  // Limita sangría visual en niveles profundos para mantener legibilidad móvil
   const indentClass =
     depth === 0
       ? ''
       : depth <= 3
-        ? 'ml-4 pl-3.5 sm:ml-7 sm:pl-4 border-l border-white/[0.1]'
-        : 'ml-2 pl-3 sm:ml-5 sm:pl-4 border-l border-white/[0.08]';
+        ? 'ml-4 pl-3.5 sm:ml-7 sm:pl-4 border-l border-[var(--border-subtle)]'
+        : 'ml-2 pl-3 sm:ml-5 sm:pl-4 border-l border-[var(--border-subtle)]';
 
   async function handleReplySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +123,7 @@ function CommentItem({
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              <span className="font-semibold text-[#E8ECF4] truncate max-w-[180px]">
+              <span className="font-semibold text-[var(--text-main)] truncate max-w-[180px]">
                 {authorName}
               </span>
               <OwnerBadge
@@ -132,18 +131,18 @@ function CommentItem({
                 badge={node.author?.badge}
                 size="xs"
               />
-              <span aria-hidden="true" className="text-[#596273]">
+              <span aria-hidden="true" className="text-[var(--text-muted)]">
                 ·
               </span>
               <time
                 dateTime={node.created_at}
-                className="text-[#8B95A5] tabular-nums"
+                className="text-[var(--text-muted)] tabular-nums"
               >
                 {formatRelativeDate(node.created_at)}
               </time>
             </div>
 
-            <p className="mt-1.5 text-sm leading-relaxed text-[#D8DEE9] whitespace-pre-wrap break-words">
+            <p className="mt-1.5 reading-prose-compact text-[var(--text-main)] whitespace-pre-wrap break-words">
               {node.content}
             </p>
 
@@ -158,7 +157,7 @@ function CommentItem({
                   setReplyError(null);
                   onToggleReply(isReplying ? null : node.id);
                 }}
-                className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg px-2.5 -ml-2.5 text-xs font-medium text-[#8B95A5] hover:bg-white/[0.05] hover:text-[#E5E9F0] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg px-2.5 -ml-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
               >
                 <CornerDownRight size={14} aria-hidden="true" />
                 <span>{isReplying ? 'Cancelar' : 'Responder'}</span>
@@ -168,7 +167,7 @@ function CommentItem({
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
-                  className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-[#8B95A5] hover:bg-red-500/10 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-red-500/12 hover:text-red-600 dark:hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                 >
                   <Trash2 size={13} aria-hidden="true" />
                   <span>Eliminar</span>
@@ -177,12 +176,14 @@ function CommentItem({
 
               {canDelete && confirmingDelete && (
                 <div className="inline-flex items-center gap-1.5 pl-1 text-xs">
-                  <span className="text-[#9AA4B6]">¿Eliminar comentario?</span>
+                  <span className="text-[var(--text-secondary)]">
+                    ¿Eliminar comentario?
+                  </span>
                   <button
                     type="button"
                     disabled={isDeleting}
                     onClick={handleConfirmDelete}
-                    className="min-h-[32px] rounded-lg bg-red-500/20 px-2.5 font-medium text-red-200 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
+                    className="min-h-[32px] rounded-lg bg-red-600 px-2.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
                   >
                     {isDeleting ? 'Eliminando…' : 'Confirmar'}
                   </button>
@@ -190,7 +191,7 @@ function CommentItem({
                     type="button"
                     disabled={isDeleting}
                     onClick={() => setConfirmingDelete(false)}
-                    className="min-h-[32px] rounded-lg px-2 text-[#8B95A5] hover:text-white transition-colors"
+                    className="min-h-[32px] rounded-lg px-2 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors"
                   >
                     Cancelar
                   </button>
@@ -207,17 +208,17 @@ function CommentItem({
                   onChange={(event) => setReplyText(event.target.value)}
                   placeholder={`Responder a ${authorName}…`}
                   autoFocus
-                  className="w-full resize-none rounded-xl border border-white/[0.12] bg-[#0B0E14] px-3.5 py-2.5 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                  className="w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
                 />
 
                 {replyError && (
-                  <p role="alert" className="text-xs text-red-300">
+                  <p role="alert" className="text-xs text-red-600 dark:text-red-300">
                     {replyError}
                   </p>
                 )}
 
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs tabular-nums text-[#727C8F]">
+                  <span className="text-xs tabular-nums text-[var(--text-muted)]">
                     {replyText.length} / {MAX_COMMENT_LENGTH}
                   </span>
                   <div className="flex items-center gap-2">
@@ -227,14 +228,14 @@ function CommentItem({
                         setReplyText('');
                         onToggleReply(null);
                       }}
-                      className="min-h-[38px] rounded-lg px-3 text-xs font-medium text-[#97A1B2] hover:text-white transition-colors"
+                      className="min-h-[38px] rounded-lg px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       disabled={isSendingReply || !replyText.trim()}
-                      className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg bg-[#388BFF] px-3.5 text-xs font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-50 transition-colors"
+                      className="min-h-[38px] inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
                     >
                       {isSendingReply ? (
                         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -415,10 +416,10 @@ export function CommentSection({
       <div className="flex items-center justify-between gap-4 pb-5">
         <h2
           id="comments-heading"
-          className="font-display text-xl font-bold tracking-tight text-white"
+          className="font-display text-xl font-bold tracking-tight text-[var(--text-main)]"
         >
           Comentarios{' '}
-          <span className="text-base font-medium tabular-nums text-[#8B95A5]">
+          <span className="text-base font-medium tabular-nums text-[var(--text-muted)]">
             ({comments.length})
           </span>
         </h2>
@@ -427,7 +428,7 @@ export function CommentSection({
       {isAuthenticated ? (
         <form
           onSubmit={handleCreateRootComment}
-          className="mb-8 rounded-2xl border border-white/[0.08] bg-[#11151D] p-4 sm:p-5"
+          className="mb-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 sm:p-5 transition-colors duration-300"
         >
           <div className="flex items-start gap-3">
             <Avatar
@@ -448,13 +449,13 @@ export function CommentSection({
                 value={newComment}
                 onChange={(event) => setNewComment(event.target.value)}
                 placeholder="Comparte tu opinión o aporta a la conversación…"
-                className="w-full resize-none rounded-xl border border-white/[0.1] bg-[#0B0E14] px-3.5 py-3 text-sm leading-relaxed text-white placeholder:text-[#667085] focus:border-[#388BFF] focus:outline-none focus:ring-2 focus:ring-[#388BFF]/30 transition-colors"
+                className="w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors duration-300"
               />
 
               {submitError && (
                 <div
                   role="alert"
-                  className="mt-2.5 flex items-center gap-2 text-xs text-red-300"
+                  className="mt-2.5 flex items-center gap-2 text-xs text-red-600 dark:text-red-300"
                 >
                   <AlertCircle size={15} aria-hidden="true" />
                   <span>{submitError}</span>
@@ -462,13 +463,13 @@ export function CommentSection({
               )}
 
               <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="text-xs tabular-nums text-[#727C8F]">
+                <span className="text-xs tabular-nums text-[var(--text-muted)]">
                   {newComment.length} / {MAX_COMMENT_LENGTH}
                 </span>
                 <button
                   type="submit"
                   disabled={isSubmitting || !newComment.trim()}
-                  className="min-h-[42px] inline-flex items-center gap-2 rounded-xl bg-[#388BFF] px-4 py-2 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#388BFF]"
+                  className="min-h-[42px] inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                 >
                   {isSubmitting ? (
                     <>
@@ -487,14 +488,14 @@ export function CommentSection({
           </div>
         </form>
       ) : (
-        <div className="mb-8 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-[#11151D] p-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#A5AFBF]">
+        <div className="mb-8 flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:flex-row sm:items-center sm:justify-between transition-colors duration-300">
+          <p className="text-sm text-[var(--text-secondary)]">
             Inicia sesión para comentar o responder en esta conversación.
           </p>
           <button
             type="button"
             onClick={onOpenAuth}
-            className="min-h-[44px] shrink-0 rounded-xl bg-[#388BFF] px-4 py-2 text-sm font-semibold text-[#06101F] hover:bg-[#529BFF] transition-colors whitespace-nowrap"
+            className="min-h-[44px] shrink-0 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] transition-colors whitespace-nowrap"
           >
             Iniciar sesión / Registrarse
           </button>
@@ -506,42 +507,50 @@ export function CommentSection({
           {[1, 2].map((item) => (
             <div
               key={item}
-              className="rounded-xl border border-white/[0.06] bg-[#11151D]/60 p-4"
+              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4"
             >
-              <div className="h-3.5 w-32 rounded bg-[#1B212D]" />
-              <div className="mt-3 h-4 w-5/6 rounded bg-[#1B212D]" />
+              <div className="h-3.5 w-32 rounded bg-[var(--bg-elevated)]" />
+              <div className="mt-3 h-4 w-5/6 rounded bg-[var(--bg-subtle)]" />
             </div>
           ))}
         </div>
       ) : loadError ? (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-2.5">
-            <AlertCircle size={18} className="shrink-0 text-red-400" aria-hidden="true" />
+            <AlertCircle
+              size={18}
+              className="shrink-0 text-red-500 dark:text-red-400"
+              aria-hidden="true"
+            />
             <span>{loadError}</span>
           </div>
           <button
             type="button"
             onClick={() => void loadComments()}
-            className="min-h-[38px] self-start sm:self-auto rounded-lg bg-white/[0.1] px-3.5 text-xs font-medium text-white hover:bg-white/[0.16] transition-colors"
+            className="min-h-[38px] self-start sm:self-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--bg-elevated)] transition-colors"
           >
             Reintentar
           </button>
         </div>
       ) : commentTree.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-[#10131A] px-6 py-12 text-center">
-          <MessageSquare size={22} className="text-[#697489]" aria-hidden="true" />
-          <p className="mt-3 text-sm font-medium text-[#CBD5E1]">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center transition-colors duration-300">
+          <MessageSquare
+            size={22}
+            className="text-[var(--text-muted)]"
+            aria-hidden="true"
+          />
+          <p className="mt-3 text-sm font-medium text-[var(--text-main)]">
             Aún no hay comentarios
           </p>
-          <p className="mt-1 text-xs text-[#838D9F]">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Sé la primera persona en abrir el diálogo.
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-white/[0.07]">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {commentTree.map((rootNode) => (
             <CommentItem
               key={rootNode.id}

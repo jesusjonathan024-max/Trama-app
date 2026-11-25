@@ -24,28 +24,32 @@ function getMemberBadgeStyle(badge: string) {
   if (normalized === 'fundador') {
     return {
       Icon: Award,
-      classes: 'border-violet-400/40 bg-violet-500/15 text-violet-200',
-      iconClass: 'text-violet-300',
+      classes:
+        'border-violet-500/35 bg-violet-500/12 text-violet-700 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200',
+      iconClass: 'text-violet-600 dark:text-violet-300',
     };
   }
   if (normalized === 'autor verificado') {
     return {
       Icon: BadgeCheck,
-      classes: 'border-sky-400/40 bg-sky-500/15 text-sky-200',
-      iconClass: 'text-sky-300',
+      classes:
+        'border-sky-500/35 bg-sky-500/12 text-sky-700 dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-200',
+      iconClass: 'text-sky-600 dark:text-sky-300',
     };
   }
   if (normalized === 'moderador') {
     return {
       Icon: ShieldCheck,
-      classes: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
-      iconClass: 'text-emerald-300',
+      classes:
+        'border-emerald-500/35 bg-emerald-500/12 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200',
+      iconClass: 'text-emerald-600 dark:text-emerald-300',
     };
   }
   return {
     Icon: Award,
-    classes: 'border-white/20 bg-white/10 text-[#DCE3F0]',
-    iconClass: 'text-[#9EC5FF]',
+    classes:
+      'border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-main)]',
+    iconClass: 'text-[var(--accent-primary)]',
   };
 }
 
@@ -64,12 +68,12 @@ export function OwnerBadge({ role, badge, size = 'sm' }: OwnerBadgeProps) {
       {showOwner && (
         <span
           title="Dueño de Trama"
-          className={`inline-flex items-center rounded-md border border-amber-400/40 bg-amber-400/15 font-semibold tracking-wide text-amber-300 whitespace-nowrap shrink-0 select-none ${SIZE_CLASSES[size]}`}
+          className={`inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/15 font-semibold tracking-wide text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-300 whitespace-nowrap shrink-0 select-none transition-colors duration-300 ${SIZE_CLASSES[size]}`}
         >
           <Crown
             size={ICON_SIZES[size]}
             strokeWidth={2.2}
-            className="text-amber-300 shrink-0"
+            className="text-amber-600 dark:text-amber-300 shrink-0"
             aria-hidden="true"
           />
           <span>Dueño</span>
@@ -79,7 +83,7 @@ export function OwnerBadge({ role, badge, size = 'sm' }: OwnerBadgeProps) {
       {showMemberBadge && badgeStyle && BadgeIcon && (
         <span
           title={`Insignia: ${cleanedBadge}`}
-          className={`inline-flex items-center rounded-md border font-semibold tracking-wide whitespace-nowrap shrink-0 select-none ${badgeStyle.classes} ${SIZE_CLASSES[size]}`}
+          className={`inline-flex items-center rounded-md border font-semibold tracking-wide whitespace-nowrap shrink-0 select-none transition-colors duration-300 ${badgeStyle.classes} ${SIZE_CLASSES[size]}`}
         >
           <BadgeIcon
             size={ICON_SIZES[size]}
