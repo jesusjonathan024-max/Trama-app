@@ -1,4 +1,10 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import {
+  AiHttpError,
+  MAX_OUTPUT_TOKENS,
+  MAX_PROMPT_CHARS,
+  sanitizeUserText,
+} from './aiSecurity.ts';
 
 const MODEL_ID = 'gemini-4-hydrogen';
 
@@ -16,7 +22,9 @@ export interface ChatContextInput {
 }
 
 export interface ChatRequestPayload {
-  messages: ChatTurnInput[];
+  messages?: ChatTurnInput[];
+  prompt?: string;
+  message?: string;
   context?: ChatContextInput;
   useSearch?: boolean;
 }
@@ -106,17 +114,29 @@ function buildSystemInstruction(context?: ChatContextInput): string {
   const base = [
     'Eres el Asistente IA integrado en Trama, una plataforma editorial y comunitaria en español.',
     'Tus tareas principales son: resumir artículos largos de Actualidad con claridad, responder preguntas de la comunidad y verificar datos recientes usando búsqueda en Google cuando esté activa.',
-    'Responde siempre en español natural, directo y bien estructurado. Usa párrafos breves o viñetas concisas cuando ayuden a leer más rápido.',
+    'Responde siempre en español natural, directo, conciso y bien estructurado. Usa párrafos breves o viñetas claras para aprovechar bien el límite de extensión.',
     'Si verificas datos con búsqueda web, distingue claramente los hechos confirmados y fechas recientes sin inventar cifras ni fuentes.',
   ];
 
   if (context && (context.title || context.content)) {
     const sectionLabel =
       context.section === 'comunidad' ? 'Comunidad (hilo)' : 'Actualidad (artículo)';
-    const safeTitle = (context.title ?? '').trim().slice(0, 260);
-    const safeCategory = (context.category ?? '').trim().slice(0, 80);
-    const safeAuthor = (context.author ?? '').trim().slice(0, 80);
-    const safeContent = (context.content ?? '').trim().slice(0, 7500);
+    const safeTitle =
+      typeof context.title === 'string'
+        ? sanitizeUserText(context.title).slice(0, 240)
+        : '';
+    const safeCategory =
+      typeof context.category === 'string'
+        ? sanitizeUserText(context.category).slice(0, 80)
+        : '';
+    const safeAuthor =
+      typeof context.author === 'string'
+        ? sanitizeUserText(context.author).slice(0, 80)
+        : '';
+    const safeContent =
+      typeof context.content === 'string'
+        ? sanitizeUserText(context.content).slice(0, 5500)
+        : '';
 
     base.push(
       '',
@@ -136,20 +156,70 @@ function buildSystemInstruction(context?: ChatContextInput): string {
 export async function handleAiChat(
   payload: ChatRequestPayload
 ): Promise<ChatResponsePayload> {
-  if (!payload || !Array.isArray(payload.messages) || payload.messages.length === 0) {
-    throw new Error('Envía al menos un mensaje para consultar al asistente.');
+  if (!payload || typeof payload !== 'object') {
+    throw new AiHttpError(400, 'Cuerpo de solicitud inválido.');
   }
 
-  const sanitizedMessages = payload.messages
-    .slice(-16)
-    .map((turn) => ({
-      role: turn.role === 'model' ? ('model' as const) : ('user' as const),
-      text: typeof turn.text === 'string' ? turn.text.trim().slice(0, 3500) : '',
-    }))
-    .filter((turn) => turn.text.length > 0);
+  let rawTurns: ChatTurnInput[] = [];
+  if (Array.isArray(payload.messages)) {
+    rawTurns = payload.messages;
+  } else if (typeof payload.prompt === 'string') {
+    rawTurns = [{ role: 'user', text: payload.prompt }];
+  } else if (typeof payload.message === 'string') {
+    rawTurns = [{ role: 'user', text: payload.message }];
+  } else {
+    throw new AiHttpError(
+      400,
+      'Envía un mensaje de texto válido para consultar al asistente.'
+    );
+  }
 
-  if (sanitizedMessages.length === 0) {
-    throw new Error('El mensaje no puede estar vacío.');
+  if (rawTurns.length === 0) {
+    throw new AiHttpError(
+      400,
+      'Envía al menos un mensaje para consultar al asistente.'
+    );
+  }
+
+  const recentTurns = rawTurns.slice(-12);
+  const sanitizedMessages: Array<{ role: 'user' | 'model'; text: string }> = [];
+
+  for (const turn of recentTurns) {
+    if (!turn || typeof turn.text !== 'string') {
+      throw new AiHttpError(
+        400,
+        'Cada mensaje debe ser una cadena de texto válida.'
+      );
+    }
+
+    const role = turn.role === 'model' ? ('model' as const) : ('user' as const);
+    const cleaned = sanitizeUserText(turn.text);
+
+    if (role === 'user') {
+      if (cleaned.length === 0) {
+        throw new AiHttpError(400, 'El mensaje no puede estar vacío.');
+      }
+      if (cleaned.length > MAX_PROMPT_CHARS) {
+        throw new AiHttpError(
+          400,
+          `El mensaje supera el límite máximo de ${MAX_PROMPT_CHARS.toLocaleString('es-ES')} caracteres.`
+        );
+      }
+    }
+
+    if (cleaned.length > 0) {
+      sanitizedMessages.push({
+        role,
+        text: role === 'model' ? cleaned.slice(0, 3000) : cleaned,
+      });
+    }
+  }
+
+  if (
+    sanitizedMessages.length === 0 ||
+    sanitizedMessages[sanitizedMessages.length - 1].role !== 'user'
+  ) {
+    throw new AiHttpError(400, 'El mensaje del usuario no puede estar vacío.');
   }
 
   const useSearch = payload.useSearch !== false;
@@ -165,6 +235,7 @@ export async function handleAiChat(
     contents,
     config: {
       systemInstruction: buildSystemInstruction(payload.context),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
       tools: useSearch ? [{ googleSearch: {} }] : undefined,
     },
   });
@@ -199,13 +270,29 @@ export async function handleAiChat(
 export async function handleGenerateArcadeChallenge(
   input: ArcadeChallengeInput
 ): Promise<GeneratedArcadeChallenge> {
-  const cleanedPrompt =
-    typeof input?.prompt === 'string' ? input.prompt.trim().slice(0, 400) : '';
+  if (!input || typeof input.prompt !== 'string') {
+    throw new AiHttpError(
+      400,
+      'Envía una descripción de texto válida para el desafío arcade.'
+    );
+  }
+
+  const cleanedPrompt = sanitizeUserText(input.prompt);
   const baseEngine: 'astral' | 'bastion' =
-    input?.baseEngine === 'bastion' ? 'bastion' : 'astral';
+    input.baseEngine === 'bastion' ? 'bastion' : 'astral';
 
   if (cleanedPrompt.length < 3) {
-    throw new Error('Describe brevemente la temática del desafío arcade.');
+    throw new AiHttpError(
+      400,
+      'Describe brevemente la temática del desafío arcade (mínimo 3 caracteres).'
+    );
+  }
+
+  if (cleanedPrompt.length > MAX_PROMPT_CHARS) {
+    throw new AiHttpError(
+      400,
+      `La descripción supera el límite máximo de ${MAX_PROMPT_CHARS.toLocaleString('es-ES')} caracteres.`
+    );
   }
 
   const ai = createGeminiClient();
@@ -224,6 +311,7 @@ export async function handleGenerateArcadeChallenge(
       `Elige colores oscuros elegantes para bg (ej. #090B12, #0C0A14, #081014) y colores vibrantes de alto contraste para primary, accent y danger.`,
     ].join('\n'),
     config: {
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
       responseMimeType: 'application/json',
       responseSchema: {
         type: Type.OBJECT,

@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-
-const DEFAULT_SUPABASE_URL = 'https://arsfmhqwobwtzvzoragn.supabase.co';
-const DEFAULT_SUPABASE_PUBLISHABLE_KEY =
-  'sb_publishable_eIwdF37A3KY0CxfXbz_pGw_jCatsnfy';
+import {
+  DEFAULT_SUPABASE_PUBLISHABLE_KEY,
+  DEFAULT_SUPABASE_URL,
+} from './supabaseConfig';
 
 const supabaseUrl =
   (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ||

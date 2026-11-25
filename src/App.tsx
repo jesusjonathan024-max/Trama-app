@@ -289,6 +289,7 @@ function AppShell() {
       <AiAssistantDrawer
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
         context={aiContext}
         initialPrompt={aiInitialPrompt}
         onClearInitialPrompt={() => setAiInitialPrompt(null)}
