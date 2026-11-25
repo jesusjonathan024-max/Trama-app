@@ -173,3 +173,27 @@ export async function generateAiArcadeChallenge(params: {
   );
   return data.challenge;
 }
+
+export async function summarizeArticleExecutive(params: {
+  title?: string | null;
+  category?: string | null;
+  author?: string | null;
+  content: string;
+}): Promise<AiChatResponse> {
+  return sendAiChat({
+    messages: [
+      {
+        role: 'user',
+        text: 'Resume este artículo en exactamente 3 puntos clave ejecutivos, claros, neutrales y concretos en español. Usa una lista con viñetas (una idea por viñeta, máximo 2 líneas cada una) y sin introducción ni despedida.',
+      },
+    ],
+    context: {
+      section: 'actualidad',
+      title: params.title ?? null,
+      category: params.category ?? null,
+      author: params.author ?? null,
+      content: params.content,
+    },
+    useSearch: false,
+  });
+}

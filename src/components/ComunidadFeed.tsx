@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Bookmark,
   Clock,
+  Flag,
   Flame,
   Hash,
   Heart,
@@ -25,6 +26,7 @@ import {
   normalizeHashtag,
   postHasHashtag,
 } from '../lib/hashtags';
+import { fetchUserReportedPostIds } from '../lib/phase2';
 import {
   COMUNIDAD_CATEGORIES,
   deletePost,
@@ -44,6 +46,7 @@ import { FollowButton } from './FollowButton';
 import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { ReportPostModal } from './ReportPostModal';
 
 interface ComunidadFeedProps {
   selectedCategory: string;
@@ -89,6 +92,10 @@ export function ComunidadFeed({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<PostRecord | null>(null);
+  const [reportedPostIds, setReportedPostIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [reportingPost, setReportingPost] = useState<PostRecord | null>(null);
 
   const loadThreads = useCallback(async () => {
     setIsLoading(true);
@@ -110,6 +117,18 @@ export function ComunidadFeed({
   useEffect(() => {
     void loadThreads();
   }, [loadThreads, refreshKey]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setReportedPostIds(new Set());
+      return;
+    }
+    fetchUserReportedPostIds(user.id)
+      .then((ids) => setReportedPostIds(new Set(ids)))
+      .catch(() => {
+        // Ignora error auxiliar
+      });
+  }, [user?.id]);
 
   useEffect(() => {
     if (!syncedPostUpdate || syncedPostUpdate.mode !== 'comunidad') return;
@@ -801,6 +820,33 @@ export function ComunidadFeed({
                           <Trash2 size={16} aria-hidden="true" />
                         </button>
                       )}
+
+                      {user?.id !== thread.author_id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isAuthenticated || !user) {
+                              onOpenAuth();
+                              return;
+                            }
+                            setReportingPost(thread);
+                          }}
+                          disabled={reportedPostIds.has(thread.id)}
+                          title={
+                            reportedPostIds.has(thread.id)
+                              ? 'Ya reportaste esta publicación'
+                              : 'Reportar publicación'
+                          }
+                          aria-label="Reportar hilo"
+                          className={`min-h-[42px] min-w-[42px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                            reportedPostIds.has(thread.id)
+                              ? 'text-rose-400/70 cursor-default'
+                              : 'text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-400'
+                          }`}
+                        >
+                          <Flag size={15} aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -839,6 +885,17 @@ export function ComunidadFeed({
         post={editingPost}
         onClose={() => setEditingPost(null)}
         onSaved={handleEditedSaved}
+      />
+
+      <ReportPostModal
+        isOpen={Boolean(reportingPost)}
+        postId={reportingPost?.id ?? null}
+        postTitle={reportingPost?.title || reportingPost?.content.slice(0, 80)}
+        reporterId={user?.id ?? null}
+        onClose={() => setReportingPost(null)}
+        onSubmitted={(postId) =>
+          setReportedPostIds((prev) => new Set(prev).add(postId))
+        }
       />
     </section>
   );

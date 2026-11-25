@@ -20,10 +20,15 @@ import {
   READING_STATUS_OPTIONS,
   type ReadingStatus,
 } from '../lib/social';
+import {
+  fetchRatingsSummaryMap,
+  type SeriesRatingSummary,
+} from '../lib/phase2';
 import { Avatar } from './Avatar';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { StarRating } from './StarRating';
 
 export type BibliotecaFilter = 'todas' | SeriesType | 'siguiendo';
 
@@ -59,7 +64,7 @@ export function BibliotecaCatalog({
   onOpenCreateSeries,
   onOpenAuth,
 }: BibliotecaCatalogProps) {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const {
     followingIds,
     getSeriesCollection,
@@ -68,6 +73,9 @@ export function BibliotecaCatalog({
     busySeriesIds,
   } = useSocial();
   const [seriesList, setSeriesList] = useState<SeriesRecord[]>([]);
+  const [ratingsMap, setRatingsMap] = useState<
+    Record<string, SeriesRatingSummary>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -77,6 +85,18 @@ export function BibliotecaCatalog({
     try {
       const data = await fetchSeriesCatalog();
       setSeriesList(data);
+      if (data.length > 0) {
+        fetchRatingsSummaryMap(
+          data.map((s) => s.id),
+          user?.id
+        )
+          .then(setRatingsMap)
+          .catch(() => {
+            // Mantiene el catálogo funcional aunque falle la consulta auxiliar
+          });
+      } else {
+        setRatingsMap({});
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error
@@ -86,7 +106,7 @@ export function BibliotecaCatalog({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     void loadCatalog();
@@ -432,6 +452,14 @@ export function BibliotecaCatalog({
                         {series.title}
                       </h2>
                     </button>
+
+                    <div className="mt-1.5">
+                      <StarRating
+                        average={ratingsMap[series.id]?.average ?? 0}
+                        count={ratingsMap[series.id]?.count ?? 0}
+                        compact
+                      />
+                    </div>
 
                     {series.synopsis && (
                       <p className="mt-1.5 hidden sm:line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">

@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Crown,
   FileText,
+  Flag,
   Heart,
   Loader2,
   LogOut,
@@ -25,6 +26,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
@@ -33,6 +35,14 @@ import { useSocial } from '../context/SocialContext';
 import { useTheme } from '../context/ThemeContext';
 import { fetchSeriesCatalog, type SeriesRecord } from '../lib/library';
 import {
+  fetchContentReports,
+  formatReportStatusLabel,
+  isReportPendingStatus,
+  updateContentReportStatus,
+  type ContentReportRecord,
+} from '../lib/phase2';
+import {
+  deletePost,
   fetchAllMembers,
   fetchOwnerStats,
   formatRelativeDate,
@@ -57,12 +67,14 @@ import { AppearanceControls } from './AppearanceControls';
 import { Avatar } from './Avatar';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { WriterStatsCard } from './WriterStatsCard';
 
 interface ProfileSectionProps {
   onOpenAuth: () => void;
   onSignedOut: () => void;
   onOpenPost: (post: PostRecord) => void;
   onOpenSeries: (series: SeriesRecord) => void;
+  onPostDeleted?: (postId: string) => void;
 }
 
 type CollectionTab =
@@ -88,6 +100,7 @@ export function ProfileSection({
   onSignedOut,
   onOpenPost,
   onOpenSeries,
+  onPostDeleted,
 }: ProfileSectionProps) {
   const {
     user,
@@ -135,6 +148,13 @@ export function ProfileSection({
   const [memberSearch, setMemberSearch] = useState('');
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const [savedMemberId, setSavedMemberId] = useState<string | null>(null);
+
+  // Bandeja de reportes de contenido (solo Dueño)
+  const [reports, setReports] = useState<ContentReportRecord[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [reportsFilter, setReportsFilter] = useState<'pending' | 'all'>('pending');
+  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
@@ -222,12 +242,15 @@ export function ProfileSection({
     if (!isOwner) return;
     setIsLoadingStats(true);
     setIsLoadingMembers(true);
+    setIsLoadingReports(true);
     setStatsError(null);
     setMembersError(null);
+    setReportsError(null);
 
-    const [statsRes, membersRes] = await Promise.allSettled([
+    const [statsRes, membersRes, reportsRes] = await Promise.allSettled([
       fetchOwnerStats(),
       fetchAllMembers(),
+      fetchContentReports(),
     ]);
 
     if (statsRes.status === 'fulfilled') {
@@ -251,16 +274,80 @@ export function ProfileSection({
       );
     }
     setIsLoadingMembers(false);
+
+    if (reportsRes.status === 'fulfilled') {
+      setReports(reportsRes.value);
+    } else {
+      setReportsError(
+        reportsRes.reason instanceof Error
+          ? reportsRes.reason.message
+          : 'No se pudieron cargar los reportes pendientes.'
+      );
+    }
+    setIsLoadingReports(false);
   }, [isOwner]);
 
   useEffect(() => {
     if (!isOwner) {
       setOwnerStats(null);
       setMembers([]);
+      setReports([]);
       return;
     }
     void loadOwnerPanelData();
   }, [isOwner, loadOwnerPanelData]);
+
+  async function handleUpdateReportStatus(
+    reportId: string,
+    nextStatus: 'reviewed' | 'dismissed'
+  ) {
+    if (!isOwner || processingReportId) return;
+    setProcessingReportId(reportId);
+    setReportsError(null);
+    try {
+      const savedStatus = await updateContentReportStatus(reportId, nextStatus);
+      setReports((prev) =>
+        prev.map((r) => (r.id === reportId ? { ...r, status: savedStatus } : r))
+      );
+    } catch (err) {
+      setReportsError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar el estado del reporte.'
+      );
+    } finally {
+      setProcessingReportId(null);
+    }
+  }
+
+  async function handleDeleteReportedPost(report: ContentReportRecord) {
+    if (!isOwner || !user || processingReportId) return;
+    setProcessingReportId(report.id);
+    setReportsError(null);
+    try {
+      await deletePost(report.post_id, user.id, true);
+      onPostDeleted?.(report.post_id);
+      const savedStatus = await updateContentReportStatus(
+        report.id,
+        'reviewed'
+      ).catch(() => 'reviewed');
+      setReports((prev) =>
+        prev.map((r) =>
+          r.post_id === report.post_id
+            ? { ...r, status: savedStatus, post: null }
+            : r
+        )
+      );
+    } catch (err) {
+      setReportsError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo eliminar la publicación reportada.'
+      );
+    } finally {
+      setProcessingReportId(null);
+    }
+  }
 
   async function handleAssignMemberBadge(memberId: string, rawValue: string) {
     if (!isOwner || updatingMemberId) return;
@@ -626,6 +713,14 @@ export function ProfileSection({
           )}
           <span>Cerrar sesión</span>
         </button>
+      </div>
+
+      {/* Estadísticas de Escritor del usuario */}
+      <div className="mt-7">
+        <WriterStatsCard
+          userId={user.id}
+          heading="Mis Estadísticas de Escritor"
+        />
       </div>
 
       {/* Tarjeta de Apariencia y Lectura (sincronizada con Supabase profiles) */}
@@ -1246,6 +1341,227 @@ export function ProfileSection({
                 });
               })()}
             </div>
+          </div>
+
+          {/* Reportes Pendientes de Contenido (solo Dueño) */}
+          <div className="mt-6 border-t border-[var(--border-subtle)] pt-5">
+            {(() => {
+              const pendingCount = reports.filter((r) =>
+                isReportPendingStatus(r.status)
+              ).length;
+              const visibleReports =
+                reportsFilter === 'pending'
+                  ? reports.filter((r) => isReportPendingStatus(r.status))
+                  : reports;
+
+              return (
+                <>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <Flag
+                        size={17}
+                        className="text-rose-400 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display text-base font-bold text-[var(--text-main)]">
+                            Reportes Pendientes
+                          </h3>
+                          {pendingCount > 0 && (
+                            <span className="rounded-md bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[11px] font-bold text-rose-400 tabular-nums">
+                              {pendingCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Revisa alertas de noticias falsas o contenido reportado por la comunidad.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setReportsFilter('pending')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          reportsFilter === 'pending'
+                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                        }`}
+                      >
+                        Pendientes ({pendingCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportsFilter('all')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          reportsFilter === 'all'
+                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                        }`}
+                      >
+                        Todos ({reports.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {reportsError && (
+                    <div
+                      role="alert"
+                      className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-700 dark:text-red-200"
+                    >
+                      <AlertCircle
+                        size={15}
+                        className="mt-0.5 shrink-0 text-red-500 dark:text-red-400"
+                        aria-hidden="true"
+                      />
+                      <span>{reportsError}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-4 max-h-[380px] space-y-2.5 overflow-y-auto pr-1">
+                    {isLoadingReports && reports.length === 0 ? (
+                      <div className="space-y-2 animate-pulse">
+                        <div className="h-20 rounded-xl bg-[var(--bg-subtle)]" />
+                        <div className="h-20 rounded-xl bg-[var(--bg-subtle)]" />
+                      </div>
+                    ) : visibleReports.length === 0 ? (
+                      <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-6 text-center text-xs text-[var(--text-muted)]">
+                        {reportsFilter === 'pending'
+                          ? 'No hay reportes pendientes por revisar.'
+                          : 'Todavía no se han registrado reportes.'}
+                      </p>
+                    ) : (
+                      visibleReports.map((report) => {
+                        const isPending = isReportPendingStatus(report.status);
+                        const isBusy = processingReportId === report.id;
+                        const reporterName = getAuthorDisplayName(
+                          report.reporter
+                        );
+
+                        return (
+                          <div
+                            key={report.id}
+                            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3.5 space-y-2.5 transition-colors"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
+                                    isPending
+                                      ? 'border-rose-500/35 bg-rose-500/12 text-rose-400'
+                                      : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)]'
+                                  }`}
+                                >
+                                  {formatReportStatusLabel(report.status)}
+                                </span>
+                                <span className="text-[var(--text-secondary)]">
+                                  Reportado por{' '}
+                                  <strong className="text-[var(--text-main)]">
+                                    {reporterName}
+                                  </strong>
+                                </span>
+                              </div>
+                              <time
+                                dateTime={report.created_at}
+                                className="text-[11px] text-[var(--text-muted)] tabular-nums"
+                              >
+                                {formatRelativeDate(report.created_at)}
+                              </time>
+                            </div>
+
+                            <p className="text-xs text-[var(--text-main)]">
+                              <span className="text-[var(--text-muted)]">
+                                Motivo:{' '}
+                              </span>
+                              {report.reason}
+                            </p>
+
+                            {report.post ? (
+                              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs">
+                                <p className="text-[10px] font-semibold text-[var(--accent-primary)]">
+                                  {report.post.mode === 'actualidad'
+                                    ? 'Actualidad'
+                                    : 'Comunidad'}{' '}
+                                  · {report.post.category}
+                                </p>
+                                <p className="mt-0.5 font-semibold text-[var(--text-main)] line-clamp-1">
+                                  {report.post.title ||
+                                    report.post.content.slice(0, 90)}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] italic text-[var(--text-muted)]">
+                                La publicación asociada ya fue eliminada.
+                              </p>
+                            )}
+
+                            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                              {isPending && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() =>
+                                      void handleUpdateReportStatus(
+                                        report.id,
+                                        'reviewed'
+                                      )
+                                    }
+                                    className="min-h-[34px] inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+                                  >
+                                    <Check size={13} aria-hidden="true" />
+                                    <span>Marcar revisado</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() =>
+                                      void handleUpdateReportStatus(
+                                        report.id,
+                                        'dismissed'
+                                      )
+                                    }
+                                    className="min-h-[34px] inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-50 transition-colors"
+                                  >
+                                    <X size={13} aria-hidden="true" />
+                                    <span>Descartar</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {report.post && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() =>
+                                    void handleDeleteReportedPost(report)
+                                  }
+                                  className="min-h-[34px] inline-flex items-center gap-1.5 rounded-lg bg-red-600/90 hover:bg-red-500 px-3 text-xs font-semibold text-white disabled:opacity-50 transition-colors"
+                                >
+                                  {isBusy ? (
+                                    <Loader2
+                                      size={13}
+                                      className="animate-spin"
+                                      aria-hidden="true"
+                                    />
+                                  ) : (
+                                    <Trash2 size={13} aria-hidden="true" />
+                                  )}
+                                  <span>Eliminar publicación</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

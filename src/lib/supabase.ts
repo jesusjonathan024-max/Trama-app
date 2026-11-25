@@ -50,11 +50,31 @@ export function isOwnerRole(role: string | null | undefined): boolean {
   return (role ?? '').trim().toLowerCase() === 'owner';
 }
 
+export function isModeratorRole(role: string | null | undefined): boolean {
+  return (role ?? '').trim().toLowerCase() === 'moderator';
+}
+
+export function canVerifyEditorialRole(role: string | null | undefined): boolean {
+  return isOwnerRole(role) || isModeratorRole(role);
+}
+
 export function isSafeHttpUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+export function isStrictHttpsUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (!trimmed.toLowerCase().startsWith('https://')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' && Boolean(parsed.hostname);
   } catch {
     return false;
   }

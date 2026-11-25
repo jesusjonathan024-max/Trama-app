@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AlertCircle, Loader2, Save, X } from 'lucide-react';
+import { AlertCircle, Link2, Loader2, Save, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   ACTUALIDAD_CATEGORIES,
@@ -7,6 +7,7 @@ import {
   updatePost,
   type PostRecord,
 } from '../lib/posts';
+import { isStrictHttpsUrl } from '../lib/supabase';
 
 interface EditPostModalProps {
   post: PostRecord | null;
@@ -26,6 +27,8 @@ export function EditPostModal({
   const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [sourceName, setSourceName] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -34,6 +37,8 @@ export function EditPostModal({
     setCategory(post.category);
     setTitle(post.title ?? '');
     setContent(post.content);
+    setSourceName(post.source_name ?? '');
+    setSourceUrl(post.source_url ?? '');
     setErrorMsg(null);
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -61,6 +66,8 @@ export function EditPostModal({
     setErrorMsg(null);
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
+    const trimmedSourceName = sourceName.trim();
+    const trimmedSourceUrl = sourceUrl.trim();
 
     if (isActualidad && !trimmedTitle) {
       setErrorMsg('El título es obligatorio para los artículos de Actualidad.');
@@ -69,6 +76,17 @@ export function EditPostModal({
 
     if (!trimmedContent) {
       setErrorMsg('El contenido de la publicación no puede quedar vacío.');
+      return;
+    }
+
+    if (
+      isActualidad &&
+      trimmedSourceUrl &&
+      !isStrictHttpsUrl(trimmedSourceUrl)
+    ) {
+      setErrorMsg(
+        'El enlace de referencia debe ser una URL válida que empiece con https://'
+      );
       return;
     }
 
@@ -81,6 +99,8 @@ export function EditPostModal({
         category,
         title: trimmedTitle || null,
         content: trimmedContent,
+        sourceName: isActualidad ? trimmedSourceName || null : undefined,
+        sourceUrl: isActualidad ? trimmedSourceUrl || null : undefined,
       });
 
       onSaved({
@@ -88,6 +108,8 @@ export function EditPostModal({
         category,
         title: trimmedTitle || null,
         content: trimmedContent,
+        source_name: isActualidad ? trimmedSourceName || null : post.source_name,
+        source_url: isActualidad ? trimmedSourceUrl || null : post.source_url,
       });
       onClose();
     } catch (err) {
@@ -220,6 +242,57 @@ export function EditPostModal({
               className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
+
+          {isActualidad && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-main)]">
+                <Link2
+                  size={15}
+                  className="text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
+                <span>Fuente de referencia (opcional)</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="edit-post-source-name"
+                    className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
+                  >
+                    Nombre de la fuente
+                  </label>
+                  <input
+                    id="edit-post-source-name"
+                    type="text"
+                    maxLength={120}
+                    value={sourceName}
+                    onChange={(event) => setSourceName(event.target.value)}
+                    placeholder="Ej. Reuters, BBC Mundo, El País"
+                    className="min-h-[42px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="edit-post-source-url"
+                    className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
+                  >
+                    Enlace de referencia (https://)
+                  </label>
+                  <input
+                    id="edit-post-source-url"
+                    type="url"
+                    maxLength={500}
+                    value={sourceUrl}
+                    onChange={(event) => setSourceUrl(event.target.value)}
+                    placeholder="https://ejemplo.com/articulo"
+                    className="min-h-[42px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {errorMsg && (
             <div

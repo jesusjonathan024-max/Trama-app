@@ -1,4 +1,9 @@
-import { MEDIA_BUCKET, isSafeHttpUrl, supabase } from './supabase';
+import {
+  MEDIA_BUCKET,
+  isSafeHttpUrl,
+  isStrictHttpsUrl,
+  supabase,
+} from './supabase';
 
 export type PostMode = 'actualidad' | 'comunidad';
 
@@ -50,6 +55,10 @@ export interface PostRecord {
   title: string | null;
   content: string;
   image_url: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  is_verified: boolean;
+  views_count: number;
   is_pinned: boolean;
   created_at: string;
   author: PostAuthor | null;
@@ -60,7 +69,8 @@ export interface PostRecord {
 
 export interface CommentRecord {
   id: string;
-  post_id: string;
+  post_id: string | null;
+  chapter_id: string | null;
   author_id: string;
   parent_id: string | null;
   content: string;
@@ -90,6 +100,10 @@ interface RawPostRow {
   title: string | null;
   content: string;
   image_url: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  is_verified?: boolean | null;
+  views_count?: number | null;
   likes_count: number | null;
   is_pinned?: boolean | null;
   created_at: string;
@@ -100,7 +114,8 @@ interface RawPostRow {
 
 interface RawCommentRow {
   id: string;
-  post_id: string;
+  post_id: string | null;
+  chapter_id?: string | null;
   author_id: string;
   parent_id: string | null;
   content: string;
@@ -137,6 +152,13 @@ function mapRawPost(
     title: row.title ?? null,
     content: row.content ?? '',
     image_url: row.image_url ?? null,
+    source_name: row.source_name?.trim() || null,
+    source_url:
+      row.source_url && isStrictHttpsUrl(row.source_url)
+        ? row.source_url.trim()
+        : null,
+    is_verified: Boolean(row.is_verified),
+    views_count: typeof row.views_count === 'number' ? row.views_count : 0,
     is_pinned: Boolean(row.is_pinned),
     created_at: row.created_at,
     author: normalizeAuthor(row.author),
@@ -159,6 +181,10 @@ const POST_SELECT_WITH_PIN = `
   title,
   content,
   image_url,
+  source_name,
+  source_url,
+  is_verified,
+  views_count,
   likes_count,
   is_pinned,
   created_at,
@@ -175,6 +201,10 @@ const POST_SELECT_BASE = `
   title,
   content,
   image_url,
+  source_name,
+  source_url,
+  is_verified,
+  views_count,
   likes_count,
   created_at,
   author:profiles!posts_author_id_fkey(id, username, avatar_url, role, badge),
@@ -341,6 +371,29 @@ export async function togglePostPin(
   }
 }
 
+export async function togglePostVerified(
+  postId: string,
+  nextVerified: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_verified: nextVerified })
+    .eq('id', postId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function incrementPostViews(postId: string): Promise<void> {
+  const { error } = await supabase.rpc('increment_post_views', {
+    p_post_id: postId,
+  });
+  if (error) {
+    console.warn('No se pudo incrementar views_count:', error.message);
+  }
+}
+
 export async function updatePost(params: {
   postId: string;
   userId: string;
@@ -348,14 +401,34 @@ export async function updatePost(params: {
   category: string;
   title: string | null;
   content: string;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
 }): Promise<void> {
+  const normalizedSourceName = params.sourceName?.trim() || null;
+  const normalizedSourceUrl = params.sourceUrl?.trim() || null;
+
+  if (normalizedSourceUrl && !isStrictHttpsUrl(normalizedSourceUrl)) {
+    throw new Error(
+      'El enlace de referencia debe comenzar obligatoriamente con https://'
+    );
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    category: params.category,
+    title: params.title,
+    content: params.content,
+  };
+
+  if (params.sourceName !== undefined) {
+    updatePayload.source_name = normalizedSourceName;
+  }
+  if (params.sourceUrl !== undefined) {
+    updatePayload.source_url = normalizedSourceUrl;
+  }
+
   let query = supabase
     .from('posts')
-    .update({
-      category: params.category,
-      title: params.title,
-      content: params.content,
-    })
+    .update(updatePayload)
     .eq('id', params.postId);
 
   if (!params.isOwner) {
@@ -417,7 +490,20 @@ export async function createPost(params: {
   title: string | null;
   content: string;
   imageUrl: string | null;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
 }): Promise<string> {
+  const normalizedSourceName =
+    params.mode === 'actualidad' ? params.sourceName?.trim() || null : null;
+  const normalizedSourceUrl =
+    params.mode === 'actualidad' ? params.sourceUrl?.trim() || null : null;
+
+  if (normalizedSourceUrl && !isStrictHttpsUrl(normalizedSourceUrl)) {
+    throw new Error(
+      'El enlace de referencia debe comenzar obligatoriamente con https://'
+    );
+  }
+
   const { data, error } = await supabase
     .from('posts')
     .insert({
@@ -427,6 +513,8 @@ export async function createPost(params: {
       title: params.title,
       content: params.content,
       image_url: params.imageUrl,
+      source_name: normalizedSourceName,
+      source_url: normalizedSourceUrl,
     })
     .select('id')
     .single();
@@ -455,13 +543,26 @@ export async function deletePost(
   }
 }
 
+function mapRawComment(row: RawCommentRow): CommentRecord {
+  return {
+    id: row.id,
+    post_id: row.post_id ?? null,
+    chapter_id: row.chapter_id ?? null,
+    author_id: row.author_id,
+    parent_id: row.parent_id ?? null,
+    content: row.content,
+    created_at: row.created_at,
+    author: normalizeAuthor(row.author),
+  };
+}
+
 export async function fetchCommentsForPost(
   postId: string
 ): Promise<CommentRecord[]> {
   const { data, error } = await supabase
     .from('comments')
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
+      'id, post_id, chapter_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
     )
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
@@ -471,33 +572,60 @@ export async function fetchCommentsForPost(
   }
 
   const rows = (data ?? []) as unknown as RawCommentRow[];
-  return rows.map((row) => ({
-    id: row.id,
-    post_id: row.post_id,
-    author_id: row.author_id,
-    parent_id: row.parent_id ?? null,
-    content: row.content,
-    created_at: row.created_at,
-    author: normalizeAuthor(row.author),
-  }));
+  return rows.map(mapRawComment);
+}
+
+export async function fetchCommentsForChapter(
+  chapterId: string
+): Promise<CommentRecord[]> {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(
+      'id, post_id, chapter_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
+    )
+    .eq('chapter_id', chapterId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as unknown as RawCommentRow[];
+  return rows.map(mapRawComment);
 }
 
 export async function createComment(params: {
-  postId: string;
+  postId?: string | null;
+  chapterId?: string | null;
   authorId: string;
   content: string;
   parentId?: string | null;
 }): Promise<CommentRecord> {
+  if (!params.postId && !params.chapterId) {
+    throw new Error('Falta la referencia de la publicación o del capítulo.');
+  }
+
+  const insertPayload: Record<string, unknown> = {
+    author_id: params.authorId,
+    content: params.content,
+    parent_id: params.parentId ?? null,
+  };
+
+  if (params.postId) {
+    insertPayload.post_id = params.postId;
+  } else {
+    insertPayload.post_id = null;
+  }
+
+  if (params.chapterId) {
+    insertPayload.chapter_id = params.chapterId;
+  }
+
   const { data, error } = await supabase
     .from('comments')
-    .insert({
-      post_id: params.postId,
-      author_id: params.authorId,
-      content: params.content,
-      parent_id: params.parentId ?? null,
-    })
+    .insert(insertPayload)
     .select(
-      'id, post_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
+      'id, post_id, chapter_id, author_id, parent_id, content, created_at, author:profiles(id, username, avatar_url, role, badge)'
     )
     .single();
 
@@ -505,16 +633,7 @@ export async function createComment(params: {
     throw new Error(error.message);
   }
 
-  const row = data as unknown as RawCommentRow;
-  return {
-    id: row.id,
-    post_id: row.post_id,
-    author_id: row.author_id,
-    parent_id: row.parent_id ?? null,
-    content: row.content,
-    created_at: row.created_at,
-    author: normalizeAuthor(row.author),
-  };
+  return mapRawComment(data as unknown as RawCommentRow);
 }
 
 export async function deleteComment(

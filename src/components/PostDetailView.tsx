@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  BadgeCheck,
   Bookmark,
   Clock,
+  ExternalLink,
+  Eye,
+  Flag,
   Globe,
   Heart,
+  Link2,
   Loader2,
   MessageSquare,
   Pencil,
@@ -13,9 +18,12 @@ import {
   PinOff,
   Sparkles,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
+import { summarizeArticleExecutive } from '../lib/ai';
+import { fetchUserReportedPostIds } from '../lib/phase2';
 import {
   deletePost,
   estimateReadMinutes,
@@ -23,8 +31,10 @@ import {
   formatEditorialDate,
   formatRelativeDate,
   getAuthorDisplayName,
+  incrementPostViews,
   togglePostLike,
   togglePostPin,
+  togglePostVerified,
   type PostRecord,
 } from '../lib/posts';
 import { Avatar } from './Avatar';
@@ -34,6 +44,8 @@ import { FollowButton } from './FollowButton';
 import { HashtagText } from './HashtagText';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { ReportPostModal } from './ReportPostModal';
+import { VerifiedBadge } from './VerifiedBadge';
 
 interface PostDetailViewProps {
   initialPost: PostRecord;
@@ -56,19 +68,53 @@ export function PostDetailView({
   onPostDeleted,
   onOpenAssistant,
 }: PostDetailViewProps) {
-  const { user, isAuthenticated, isOwner } = useAuth();
+  const { user, isAuthenticated, isOwner, canVerifyNews } = useAuth();
   const { isPostSaved, busySavePostIds, toggleSavePost } = useSocial();
   const [post, setPost] = useState<PostRecord>(initialPost);
   const [isTogglingLike, setIsTogglingLike] = useState(false);
   const [isTogglingPin, setIsTogglingPin] = useState(false);
+  const [isTogglingVerified, setIsTogglingVerified] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [alreadyReported, setAlreadyReported] = useState(false);
+
+  // Resumen ejecutivo inline con IA (3 puntos clave)
+  const [aiSummaryText, setAiSummaryText] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  const viewedPostIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPost(initialPost);
+    setAiSummaryText(null);
+    setSummaryError(null);
   }, [initialPost]);
+
+  useEffect(() => {
+    if (!initialPost.id || viewedPostIdRef.current === initialPost.id) return;
+    viewedPostIdRef.current = initialPost.id;
+    void incrementPostViews(initialPost.id);
+    setPost((prev) => ({
+      ...prev,
+      views_count: (prev.views_count ?? 0) + 1,
+    }));
+  }, [initialPost.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setAlreadyReported(false);
+      return;
+    }
+    fetchUserReportedPostIds(user.id)
+      .then((ids) => setAlreadyReported(ids.includes(initialPost.id)))
+      .catch(() => {
+        // Ignora error auxiliar
+      });
+  }, [user?.id, initialPost.id]);
 
   useEffect(() => {
     let active = true;
@@ -182,6 +228,61 @@ export function PostDetailView({
     }
   }
 
+  async function handleToggleVerified() {
+    if (!canVerifyNews || isTogglingVerified) return;
+    setActionError(null);
+    const previous = post;
+    const optimistic: PostRecord = {
+      ...previous,
+      is_verified: !previous.is_verified,
+    };
+    setPost(optimistic);
+    onPostUpdated(optimistic);
+    setIsTogglingVerified(true);
+
+    try {
+      await togglePostVerified(post.id, optimistic.is_verified);
+    } catch (err) {
+      setPost(previous);
+      onPostUpdated(previous);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar la verificación de esta noticia.'
+      );
+    } finally {
+      setIsTogglingVerified(false);
+    }
+  }
+
+  async function handleGenerateExecutiveSummary() {
+    if (!isAuthenticated || !user) {
+      onOpenAuth();
+      return;
+    }
+    if (isSummarizing) return;
+
+    setIsSummarizing(true);
+    setSummaryError(null);
+    try {
+      const response = await summarizeArticleExecutive({
+        title: post.title,
+        category: post.category,
+        author: getAuthorDisplayName(post.author),
+        content: post.content,
+      });
+      setAiSummaryText(response.text);
+    } catch (err) {
+      setSummaryError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo generar el resumen ejecutivo en este momento.'
+      );
+    } finally {
+      setIsSummarizing(false);
+    }
+  }
+
   async function handleToggleSave() {
     if (!isAuthenticated) {
       onOpenAuth();
@@ -209,8 +310,27 @@ export function PostDetailView({
           <span>Volver a {isActualidad ? 'Actualidad' : 'Comunidad'}</span>
         </button>
 
-        {canModerate && !confirmingDelete && (
+        {((canModerate && !confirmingDelete) ||
+          (isActualidad && canVerifyNews && !confirmingDelete)) && (
           <div className="flex flex-wrap items-center gap-1.5">
+            {isActualidad && canVerifyNews && (
+              <button
+                type="button"
+                onClick={() => void handleToggleVerified()}
+                disabled={isTogglingVerified}
+                className={`min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                  post.is_verified
+                    ? 'border-emerald-500/40 bg-emerald-500/12 text-emerald-500 hover:bg-emerald-500/20'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-emerald-500/40 hover:text-emerald-500'
+                }`}
+              >
+                <BadgeCheck size={14} aria-hidden="true" />
+                <span>
+                  {post.is_verified ? 'Verificada' : 'Verificar noticia'}
+                </span>
+              </button>
+            )}
+
             {isOwner && (
               <button
                 type="button"
@@ -236,23 +356,27 @@ export function PostDetailView({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            >
-              <Pencil size={14} aria-hidden="true" />
-              <span>Editar</span>
-            </button>
+            {canModerate && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Pencil size={14} aria-hidden="true" />
+                <span>Editar</span>
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            >
-              <Trash2 size={14} aria-hidden="true" />
-              <span>Eliminar</span>
-            </button>
+            {canModerate && (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              >
+                <Trash2 size={14} aria-hidden="true" />
+                <span>Eliminar</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -315,6 +439,14 @@ export function PostDetailView({
               <Clock size={12} aria-hidden="true" />
               {readMinutes} min de lectura
             </span>
+            <span aria-hidden="true" className="text-[var(--text-muted)]">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1 text-[var(--text-muted)] tabular-nums">
+              <Eye size={12} aria-hidden="true" />
+              {post.views_count} {post.views_count === 1 ? 'lectura' : 'lecturas'}
+            </span>
+            {post.is_verified && <VerifiedBadge />}
           </div>
 
           <h1 className="mt-3 text-balance font-display text-3xl font-bold leading-tight tracking-tight text-[var(--text-main)] sm:text-4xl">
@@ -364,16 +496,22 @@ export function PostDetailView({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  onOpenAssistant(
-                    post,
-                    'Resúmeme este artículo en 4 puntos clave claros y objetivos.'
-                  )
-                }
-                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
+                onClick={() => void handleGenerateExecutiveSummary()}
+                disabled={isSummarizing}
+                className="min-h-[40px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] disabled:opacity-60 transition-colors duration-300"
               >
-                <Sparkles size={14} aria-hidden="true" />
-                <span>Resumir con IA</span>
+                {isSummarizing ? (
+                  <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Sparkles size={14} aria-hidden="true" />
+                )}
+                <span>
+                  {isSummarizing
+                    ? 'Resumiendo…'
+                    : aiSummaryText
+                      ? 'Actualizar resumen IA'
+                      : 'Resumir con IA'}
+                </span>
               </button>
 
               <button
@@ -395,6 +533,82 @@ export function PostDetailView({
               </button>
             </div>
           </div>
+
+          {/* Tarjeta de Resumen Ejecutivo IA (3 puntos clave) */}
+          {(isSummarizing || aiSummaryText || summaryError) && (
+            <div className="mt-6 rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4 sm:p-5 transition-colors duration-300">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)]">
+                  <Sparkles size={15} aria-hidden="true" />
+                  <span>Resumen Ejecutivo IA · 3 puntos clave</span>
+                </div>
+                {!isSummarizing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiSummaryText(null);
+                      setSummaryError(null);
+                    }}
+                    aria-label="Cerrar resumen"
+                    className="rounded-lg p-1 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+
+              {isSummarizing ? (
+                <div className="flex items-center gap-2.5 text-sm text-[var(--text-secondary)]">
+                  <Loader2
+                    size={15}
+                    className="animate-spin text-[var(--accent-primary)]"
+                    aria-hidden="true"
+                  />
+                  <span>Analizando el artículo y extrayendo los 3 puntos clave…</span>
+                </div>
+              ) : summaryError ? (
+                <p className="text-xs text-red-500 dark:text-red-300">
+                  {summaryError}
+                </p>
+              ) : (
+                <div className="text-sm leading-relaxed text-[var(--text-main)] whitespace-pre-line">
+                  {aiSummaryText}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fuente de referencia editorial */}
+          {(post.source_name || post.source_url) && (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-xs transition-colors duration-300">
+              <div className="flex items-center gap-2 min-w-0">
+                <Link2
+                  size={15}
+                  className="shrink-0 text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
+                <span className="text-[var(--text-muted)]">Fuente de referencia:</span>
+                <span className="font-semibold text-[var(--text-main)] truncate">
+                  {post.source_name ||
+                    (post.source_url
+                      ? new URL(post.source_url).hostname.replace(/^www\./, '')
+                      : '')}
+                </span>
+              </div>
+
+              {post.source_url && (
+                <a
+                  href={post.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-semibold text-[var(--accent-primary)] hover:underline shrink-0"
+                >
+                  <span>Abrir enlace original</span>
+                  <ExternalLink size={13} aria-hidden="true" />
+                </a>
+              )}
+            </div>
+          )}
 
           {post.image_url && (
             <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
@@ -462,6 +676,28 @@ export function PostDetailView({
                 {post.comments_count === 1 ? 'comentario' : 'comentarios'}
               </span>
             </div>
+
+            {user?.id !== post.author_id && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAuthenticated || !user) {
+                    onOpenAuth();
+                    return;
+                  }
+                  setIsReportOpen(true);
+                }}
+                disabled={alreadyReported}
+                className={`ml-auto min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
+                  alreadyReported
+                    ? 'border-rose-500/25 bg-rose-500/8 text-rose-400 cursor-default'
+                    : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:border-rose-500/35 hover:text-rose-400'
+                }`}
+              >
+                <Flag size={13} aria-hidden="true" />
+                <span>{alreadyReported ? 'Reportado' : 'Reportar'}</span>
+              </button>
+            )}
           </div>
         </article>
       ) : (
@@ -605,14 +841,38 @@ export function PostDetailView({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onOpenAssistant(post)}
-              className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
-            >
-              <Sparkles size={14} aria-hidden="true" />
-              <span>Consultar / Verificar con IA</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {user?.id !== post.author_id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isAuthenticated || !user) {
+                      onOpenAuth();
+                      return;
+                    }
+                    setIsReportOpen(true);
+                  }}
+                  disabled={alreadyReported}
+                  className={`min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
+                    alreadyReported
+                      ? 'border-rose-500/25 bg-rose-500/8 text-rose-400 cursor-default'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:border-rose-500/35 hover:text-rose-400'
+                  }`}
+                >
+                  <Flag size={13} aria-hidden="true" />
+                  <span>{alreadyReported ? 'Reportado' : 'Reportar'}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => onOpenAssistant(post)}
+                className="min-h-[42px] inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-fg)] transition-colors duration-300"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>Consultar / Verificar con IA</span>
+              </button>
+            </div>
           </div>
         </article>
       )}
@@ -644,6 +904,15 @@ export function PostDetailView({
           setPost(updated);
           onPostUpdated(updated);
         }}
+      />
+
+      <ReportPostModal
+        isOpen={isReportOpen}
+        postId={post.id}
+        postTitle={post.title || post.content.slice(0, 80)}
+        reporterId={user?.id ?? null}
+        onClose={() => setIsReportOpen(false)}
+        onSubmitted={() => setAlreadyReported(true)}
       />
     </div>
   );

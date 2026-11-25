@@ -235,20 +235,27 @@ function AppShell() {
   // Lector a pantalla completa (Novela o Manhwa)
   if (activeReader) {
     return (
-      <ChapterReaderView
-        series={activeReader.series}
-        chapters={activeReader.chapters}
-        chapterIndex={activeReader.chapterIndex}
-        onChangeChapterIndex={(nextIdx) =>
-          setActiveReader((prev) =>
-            prev ? { ...prev, chapterIndex: nextIdx } : null
-          )
-        }
-        onBackToSeries={() => {
-          setActiveReader(null);
-          window.scrollTo({ top: 0, behavior: 'instant' });
-        }}
-      />
+      <>
+        <ChapterReaderView
+          series={activeReader.series}
+          chapters={activeReader.chapters}
+          chapterIndex={activeReader.chapterIndex}
+          onChangeChapterIndex={(nextIdx) =>
+            setActiveReader((prev) =>
+              prev ? { ...prev, chapterIndex: nextIdx } : null
+            )
+          }
+          onBackToSeries={() => {
+            setActiveReader(null);
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </>
     );
   }
 
@@ -330,6 +337,7 @@ function AppShell() {
             onSignedOut={() => handleSelectView('actualidad')}
             onOpenPost={handleSelectPost}
             onOpenSeries={handleSelectSeries}
+            onPostDeleted={handlePostDeleted}
           />
         ) : activeView === 'actualidad' ? (
           <ActualidadFeed

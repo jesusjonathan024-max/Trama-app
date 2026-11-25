@@ -8,6 +8,7 @@ import {
 import {
   AlertCircle,
   ImagePlus,
+  Link2,
   Loader2,
   Send,
   Trash2,
@@ -23,6 +24,7 @@ import {
   uploadPostImage,
   type PostMode,
 } from '../lib/posts';
+import { isStrictHttpsUrl } from '../lib/supabase';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -45,6 +47,8 @@ export function CreatePostModal({
   const [category, setCategory] = useState<string>(ACTUALIDAD_CATEGORIES[0]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [sourceName, setSourceName] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,6 +137,8 @@ export function CreatePostModal({
   function resetForm() {
     setTitle('');
     setContent('');
+    setSourceName('');
+    setSourceUrl('');
     clearSelectedImage();
     setErrorMsg(null);
   }
@@ -147,6 +153,8 @@ export function CreatePostModal({
     setErrorMsg(null);
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
+    const trimmedSourceName = sourceName.trim();
+    const trimmedSourceUrl = sourceUrl.trim();
 
     if (mode === 'actualidad' && !trimmedTitle) {
       setErrorMsg('El título es obligatorio para publicar en Actualidad.');
@@ -158,6 +166,17 @@ export function CreatePostModal({
         mode === 'actualidad'
           ? 'Escribe el texto del artículo antes de publicar.'
           : 'Escribe el texto del hilo antes de publicar.'
+      );
+      return;
+    }
+
+    if (
+      mode === 'actualidad' &&
+      trimmedSourceUrl &&
+      !isStrictHttpsUrl(trimmedSourceUrl)
+    ) {
+      setErrorMsg(
+        'El enlace de referencia debe ser una URL válida que empiece con https://'
       );
       return;
     }
@@ -177,6 +196,8 @@ export function CreatePostModal({
         title: trimmedTitle || null,
         content: trimmedContent,
         imageUrl: uploadedImageUrl,
+        sourceName: mode === 'actualidad' ? trimmedSourceName || null : null,
+        sourceUrl: mode === 'actualidad' ? trimmedSourceUrl || null : null,
       });
 
       const publishedMode = mode;
@@ -373,6 +394,58 @@ export function CreatePostModal({
               className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 transition-colors"
             />
           </div>
+
+          {/* Fuentes de referencia editorial (solo en Actualidad) */}
+          {mode === 'actualidad' && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-main)]">
+                <Link2
+                  size={15}
+                  className="text-[var(--accent-primary)]"
+                  aria-hidden="true"
+                />
+                <span>Fuente de referencia (opcional)</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="post-source-name"
+                    className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
+                  >
+                    Nombre de la fuente
+                  </label>
+                  <input
+                    id="post-source-name"
+                    type="text"
+                    maxLength={120}
+                    value={sourceName}
+                    onChange={(event) => setSourceName(event.target.value)}
+                    placeholder="Ej. Reuters, BBC Mundo, El País"
+                    className="min-h-[42px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="post-source-url"
+                    className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
+                  >
+                    Enlace de referencia (https://)
+                  </label>
+                  <input
+                    id="post-source-url"
+                    type="url"
+                    maxLength={500}
+                    value={sourceUrl}
+                    onChange={(event) => setSourceUrl(event.target.value)}
+                    placeholder="https://ejemplo.com/articulo"
+                    className="min-h-[42px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Imagen opcional */}
           <div>

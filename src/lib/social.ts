@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { isStrictHttpsUrl, supabase } from './supabase';
 import {
   fetchSeriesCatalog,
   type SeriesRecord,
@@ -492,6 +492,10 @@ interface RawAuthorPostRow {
   title: string | null;
   content: string;
   image_url: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  is_verified?: boolean | null;
+  views_count?: number | null;
   likes_count: number | null;
   is_pinned?: boolean | null;
   created_at: string;
@@ -526,6 +530,13 @@ function mapSimplePostRows(
       title: row.title ?? null,
       content: row.content ?? '',
       image_url: row.image_url ?? null,
+      source_name: row.source_name?.trim() || null,
+      source_url:
+        row.source_url && isStrictHttpsUrl(row.source_url)
+          ? row.source_url.trim()
+          : null,
+      is_verified: Boolean(row.is_verified),
+      views_count: typeof row.views_count === 'number' ? row.views_count : 0,
       is_pinned: Boolean(row.is_pinned),
       created_at: row.created_at,
       author,
@@ -551,6 +562,10 @@ export async function fetchPostsByAuthor(
       title,
       content,
       image_url,
+      source_name,
+      source_url,
+      is_verified,
+      views_count,
       likes_count,
       is_pinned,
       created_at,
@@ -605,6 +620,10 @@ export async function fetchPostsByIds(
       title,
       content,
       image_url,
+      source_name,
+      source_url,
+      is_verified,
+      views_count,
       likes_count,
       is_pinned,
       created_at,

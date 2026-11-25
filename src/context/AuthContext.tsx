@@ -8,7 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { isOwnerRole, supabase, type UserProfile } from '../lib/supabase';
+import {
+  canVerifyEditorialRole,
+  isModeratorRole,
+  isOwnerRole,
+  supabase,
+  type UserProfile,
+} from '../lib/supabase';
 
 interface AuthContextValue {
   session: Session | null;
@@ -19,6 +25,8 @@ interface AuthContextValue {
   isLoadingProfile: boolean;
   isAuthenticated: boolean;
   isOwner: boolean;
+  isModerator: boolean;
+  canVerifyNews: boolean;
   refreshProfile: () => Promise<void>;
   setProfileState: (nextProfile: UserProfile, exists?: boolean) => void;
   signOut: () => Promise<{ error: string | null }>;
@@ -194,6 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isOwner = isOwnerRole(profile?.role);
+  const isModerator = isModeratorRole(profile?.role);
+  const canVerifyNews = canVerifyEditorialRole(profile?.role);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -205,6 +215,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoadingProfile,
       isAuthenticated: Boolean(session?.user),
       isOwner,
+      isModerator,
+      canVerifyNews,
       refreshProfile,
       setProfileState,
       signOut,
@@ -217,6 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoadingSession,
       isLoadingProfile,
       isOwner,
+      isModerator,
+      canVerifyNews,
       refreshProfile,
       setProfileState,
       signOut,

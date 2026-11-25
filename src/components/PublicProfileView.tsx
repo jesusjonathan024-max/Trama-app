@@ -29,6 +29,7 @@ import { Avatar } from './Avatar';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { WriterStatsCard } from './WriterStatsCard';
 
 interface PublicProfileViewProps {
   profileUserId: string;
@@ -265,6 +266,9 @@ export function PublicProfileView({
               </div>
             </div>
           </div>
+
+          {/* Estadísticas de Escritor y Lectura */}
+          <WriterStatsCard userId={profile.id} />
 
           {/* Pestañas de contenido del autor */}
           <div>

@@ -18,6 +18,7 @@ import {
   buildCommentTree,
   createComment,
   deleteComment,
+  fetchCommentsForChapter,
   fetchCommentsForPost,
   formatRelativeDate,
   getAuthorDisplayName,
@@ -28,7 +29,10 @@ import { Avatar } from './Avatar';
 import { OwnerBadge } from './OwnerBadge';
 
 interface CommentSectionProps {
-  postId: string;
+  postId?: string;
+  chapterId?: string;
+  heading?: string;
+  placeholder?: string;
   onOpenAuth: () => void;
   onCommentCountChange?: (count: number) => void;
 }
@@ -276,6 +280,9 @@ function CommentItem({
 
 export function CommentSection({
   postId,
+  chapterId,
+  heading = 'Comentarios',
+  placeholder = 'Comparte tu opinión o aporta a la conversación…',
   onOpenAuth,
   onCommentCountChange,
 }: CommentSectionProps) {
@@ -289,11 +296,26 @@ export function CommentSection({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
 
+  const fetchTargetComments = useCallback(async () => {
+    if (chapterId) {
+      return fetchCommentsForChapter(chapterId);
+    }
+    if (postId) {
+      return fetchCommentsForPost(postId);
+    }
+    return [];
+  }, [postId, chapterId]);
+
   const loadComments = useCallback(async () => {
+    if (!postId && !chapterId) {
+      setComments([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setLoadError(null);
     try {
-      const list = await fetchCommentsForPost(postId);
+      const list = await fetchTargetComments();
       setComments(list);
       onCommentCountChange?.(list.length);
     } catch (err) {
@@ -305,7 +327,7 @@ export function CommentSection({
     } finally {
       setIsLoading(false);
     }
-  }, [postId, onCommentCountChange]);
+  }, [postId, chapterId, fetchTargetComments, onCommentCountChange]);
 
   useEffect(() => {
     void loadComments();
@@ -330,7 +352,8 @@ export function CommentSection({
     setIsSubmitting(true);
     try {
       const created = await createComment({
-        postId,
+        postId: postId ?? null,
+        chapterId: chapterId ?? null,
         authorId: user.id,
         content: trimmed,
         parentId: null,
@@ -371,7 +394,8 @@ export function CommentSection({
     }
 
     const created = await createComment({
-      postId,
+      postId: postId ?? null,
+      chapterId: chapterId ?? null,
       authorId: user.id,
       content,
       parentId,
@@ -399,7 +423,7 @@ export function CommentSection({
     if (!user) return;
     try {
       await deleteComment(commentId, user.id, isOwner);
-      const refreshed = await fetchCommentsForPost(postId);
+      const refreshed = await fetchTargetComments();
       setComments(refreshed);
       onCommentCountChange?.(refreshed.length);
     } catch (err) {
@@ -418,7 +442,7 @@ export function CommentSection({
           id="comments-heading"
           className="font-display text-xl font-bold tracking-tight text-[var(--text-main)]"
         >
-          Comentarios{' '}
+          {heading}{' '}
           <span className="text-base font-medium tabular-nums text-[var(--text-muted)]">
             ({comments.length})
           </span>
@@ -448,7 +472,7 @@ export function CommentSection({
                 maxLength={MAX_COMMENT_LENGTH}
                 value={newComment}
                 onChange={(event) => setNewComment(event.target.value)}
-                placeholder="Comparte tu opinión o aporta a la conversación…"
+                placeholder={placeholder}
                 className="w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3.5 py-3 text-sm leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/25 transition-colors duration-300"
               />
 

@@ -30,11 +30,17 @@ import {
   READING_STATUS_OPTIONS,
   type ReadingStatus,
 } from '../lib/social';
+import {
+  fetchSingleSeriesRating,
+  upsertSeriesRating,
+  type SeriesRatingSummary,
+} from '../lib/phase2';
 import { Avatar } from './Avatar';
 import { CreateChapterModal } from './CreateChapterModal';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { StarRating } from './StarRating';
 
 interface SeriesDetailViewProps {
   initialSeries: SeriesRecord;
@@ -85,19 +91,31 @@ export function SeriesDetailView({
   const [progress, setProgress] = useState<ReadingProgressEntry | null>(() =>
     getReadingProgress(initialSeries.id)
   );
+  const [ratingSummary, setRatingSummary] = useState<SeriesRatingSummary>({
+    average: 0,
+    count: 0,
+    userRating: null,
+  });
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoadingChapters(true);
     setErrorMsg(null);
     try {
-      const [freshSeries, chapterList] = await Promise.all([
+      const [freshSeries, chapterList, ratingData] = await Promise.all([
         fetchSeriesById(initialSeries.id),
         fetchChaptersBySeries(initialSeries.id),
+        fetchSingleSeriesRating(initialSeries.id, user?.id).catch(() => ({
+          average: 0,
+          count: 0,
+          userRating: null,
+        })),
       ]);
       if (freshSeries) {
         setSeries(freshSeries);
       }
       setChapters(chapterList);
+      setRatingSummary(ratingData);
       setProgress(getReadingProgress(initialSeries.id));
     } catch (err) {
       setErrorMsg(
@@ -108,7 +126,7 @@ export function SeriesDetailView({
     } finally {
       setIsLoadingChapters(false);
     }
-  }, [initialSeries.id]);
+  }, [initialSeries.id, user?.id]);
 
   useEffect(() => {
     setSeries(initialSeries);
@@ -166,6 +184,29 @@ export function SeriesDetailView({
       return;
     }
     await toggleSeriesFavorite(series.id);
+  }
+
+  async function handleRateSeries(stars: number) {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    if (isSubmittingRating) return;
+    setIsSubmittingRating(true);
+    setErrorMsg(null);
+    try {
+      await upsertSeriesRating(series.id, user.id, stars);
+      const refreshed = await fetchSingleSeriesRating(series.id, user.id);
+      setRatingSummary(refreshed);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo guardar tu calificación.'
+      );
+    } finally {
+      setIsSubmittingRating(false);
+    }
   }
 
   function handleStartOrContinue() {
@@ -359,6 +400,21 @@ export function SeriesDetailView({
               <p className="mt-2 reading-prose-compact text-[var(--text-secondary)] whitespace-pre-line break-words">
                 {series.synopsis || 'Esta obra aún no tiene sinopsis.'}
               </p>
+            </div>
+
+            {/* Calificación con estrellas (1 a 5) */}
+            <div className="mt-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 transition-colors duration-300">
+              <p className="text-xs font-semibold text-[var(--text-muted)] mb-1.5">
+                Calificación de lectores
+              </p>
+              <StarRating
+                average={ratingSummary.average}
+                count={ratingSummary.count}
+                userRating={ratingSummary.userRating}
+                interactive
+                isSubmitting={isSubmittingRating}
+                onRate={(val) => void handleRateSeries(val)}
+              />
             </div>
           </div>
 

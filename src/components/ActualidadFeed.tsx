@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  BadgeCheck,
   Bookmark,
   Clock,
+  ExternalLink,
+  Eye,
+  Flag,
   Flame,
   Heart,
   MessageSquare,
@@ -17,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
+import { fetchUserReportedPostIds } from '../lib/phase2';
 import {
   ACTUALIDAD_CATEGORIES,
   deletePost,
@@ -27,6 +32,7 @@ import {
   sortPostsWithPinnedFirst,
   togglePostLike,
   togglePostPin,
+  togglePostVerified,
   type PostRecord,
 } from '../lib/posts';
 import { sortPostsByMode, type FeedSortMode } from '../lib/social';
@@ -35,6 +41,8 @@ import { EditPostModal } from './EditPostModal';
 import { FollowButton } from './FollowButton';
 import { MediaImage } from './MediaImage';
 import { OwnerBadge } from './OwnerBadge';
+import { ReportPostModal } from './ReportPostModal';
+import { VerifiedBadge } from './VerifiedBadge';
 
 interface ActualidadFeedProps {
   selectedCategory: string;
@@ -63,7 +71,7 @@ export function ActualidadFeed({
   onOpenCreate,
   onOpenAssistant,
 }: ActualidadFeedProps) {
-  const { user, isAuthenticated, isOwner } = useAuth();
+  const { user, isAuthenticated, isOwner, canVerifyNews } = useAuth();
   const { isPostSaved, busySavePostIds, toggleSavePost } = useSocial();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [sortMode, setSortMode] = useState<FeedSortMode>('recent');
@@ -72,6 +80,11 @@ export function ActualidadFeed({
   const [actionError, setActionError] = useState<string | null>(null);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
   const [pinningIds, setPinningIds] = useState<Record<string, boolean>>({});
+  const [verifyingIds, setVerifyingIds] = useState<Record<string, boolean>>({});
+  const [reportedPostIds, setReportedPostIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [reportingPost, setReportingPost] = useState<PostRecord | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<PostRecord | null>(null);
@@ -96,6 +109,18 @@ export function ActualidadFeed({
   useEffect(() => {
     void loadArticles();
   }, [loadArticles, refreshKey]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setReportedPostIds(new Set());
+      return;
+    }
+    fetchUserReportedPostIds(user.id)
+      .then((ids) => setReportedPostIds(new Set(ids)))
+      .catch(() => {
+        // Ignora error auxiliar
+      });
+  }, [user?.id]);
 
   useEffect(() => {
     if (!syncedPostUpdate || syncedPostUpdate.mode !== 'actualidad') return;
@@ -204,6 +229,46 @@ export function ActualidadFeed({
     } finally {
       setPinningIds((prev) => ({ ...prev, [post.id]: false }));
     }
+  }
+
+  async function handleToggleVerified(post: PostRecord) {
+    if (!canVerifyNews || verifyingIds[post.id]) return;
+    setActionError(null);
+    const nextVerified = !post.is_verified;
+
+    setVerifyingIds((prev) => ({ ...prev, [post.id]: true }));
+    setPosts((prev) =>
+      prev.map((item) =>
+        item.id === post.id ? { ...item, is_verified: nextVerified } : item
+      )
+    );
+
+    try {
+      await togglePostVerified(post.id, nextVerified);
+    } catch (err) {
+      setPosts((prev) =>
+        prev.map((item) =>
+          item.id === post.id
+            ? { ...item, is_verified: post.is_verified }
+            : item
+        )
+      );
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar la verificación de la noticia.'
+      );
+    } finally {
+      setVerifyingIds((prev) => ({ ...prev, [post.id]: false }));
+    }
+  }
+
+  function handleOpenReport(post: PostRecord) {
+    if (!isAuthenticated || !user) {
+      onOpenAuth();
+      return;
+    }
+    setReportingPost(post);
   }
 
   async function handleConfirmDelete(postId: string) {
@@ -508,7 +573,7 @@ export function ActualidadFeed({
                           size="xs"
                         />
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--text-muted)]">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
                         <span className="font-semibold text-[var(--accent-primary)]">
                           {leadArticle.category}
                         </span>
@@ -519,6 +584,7 @@ export function ActualidadFeed({
                         >
                           {formatEditorialDate(leadArticle.created_at)}
                         </time>
+                        {leadArticle.is_verified && <VerifiedBadge compact />}
                       </div>
                     </div>
                   </div>
@@ -531,7 +597,7 @@ export function ActualidadFeed({
                   )}
                 </div>
 
-                {/* ZONA 2: CUERPO (Título nítido, Extracto escalable, Tiempo de lectura) */}
+                {/* ZONA 2: CUERPO (Título nítido, Extracto escalable, Tiempo de lectura y Fuente) */}
                 <button
                   type="button"
                   onClick={() => onSelectPost(leadArticle)}
@@ -543,13 +609,46 @@ export function ActualidadFeed({
                   <p className="mt-3 line-clamp-3 reading-prose-compact text-[var(--text-secondary)]">
                     {leadArticle.content}
                   </p>
-                  <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] tabular-nums">
-                    <Clock size={13} aria-hidden="true" />
-                    <span>
-                      {estimateReadMinutes(leadArticle.content)} min de lectura
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-[var(--text-muted)] tabular-nums">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock size={13} aria-hidden="true" />
+                      <span>
+                        {estimateReadMinutes(leadArticle.content)} min de lectura
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Eye size={13} aria-hidden="true" />
+                      <span>{leadArticle.views_count}</span>
                     </span>
                   </div>
                 </button>
+
+                {(leadArticle.source_name || leadArticle.source_url) && (
+                  <div className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                    <span className="font-medium">Fuente:</span>
+                    {leadArticle.source_url ? (
+                      <a
+                        href={leadArticle.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold text-[var(--accent-primary)] hover:underline truncate max-w-[240px]"
+                      >
+                        <span className="truncate">
+                          {leadArticle.source_name ||
+                            new URL(leadArticle.source_url).hostname.replace(
+                              /^www\./,
+                              ''
+                            )}
+                        </span>
+                        <ExternalLink size={12} className="shrink-0" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-[var(--text-secondary)] truncate">
+                        {leadArticle.source_name}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* ZONA 3: PIE (Reacciones, Comentarios y Moderación) */}
@@ -622,6 +721,31 @@ export function ActualidadFeed({
                   </div>
 
                   <div className="flex items-center gap-0.5">
+                    {canVerifyNews && (
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleVerified(leadArticle)}
+                        disabled={Boolean(verifyingIds[leadArticle.id])}
+                        title={
+                          leadArticle.is_verified
+                            ? 'Quitar sello de Noticia Verificada'
+                            : 'Marcar como Noticia Verificada'
+                        }
+                        aria-label={
+                          leadArticle.is_verified
+                            ? 'Quitar verificación'
+                            : 'Verificar noticia'
+                        }
+                        className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                          leadArticle.is_verified
+                            ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25'
+                            : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-emerald-500'
+                        }`}
+                      >
+                        <BadgeCheck size={16} aria-hidden="true" />
+                      </button>
+                    )}
+
                     {isOwner && (
                       <button
                         type="button"
@@ -675,6 +799,27 @@ export function ActualidadFeed({
                           <Trash2 size={15} aria-hidden="true" />
                         </button>
                       )}
+
+                    {user?.id !== leadArticle.author_id && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReport(leadArticle)}
+                        disabled={reportedPostIds.has(leadArticle.id)}
+                        title={
+                          reportedPostIds.has(leadArticle.id)
+                            ? 'Ya reportaste esta publicación'
+                            : 'Reportar noticia falsa o inapropiada'
+                        }
+                        aria-label="Reportar artículo"
+                        className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                          reportedPostIds.has(leadArticle.id)
+                            ? 'text-rose-400/70 cursor-default'
+                            : 'text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-400'
+                        }`}
+                      >
+                        <Flag size={14} aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -774,7 +919,7 @@ export function ActualidadFeed({
                                   size="xs"
                                 />
                               </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--text-muted)]">
+                              <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-muted)]">
                                 <span className="font-semibold text-[var(--accent-primary)]">
                                   {article.category}
                                 </span>
@@ -785,6 +930,7 @@ export function ActualidadFeed({
                                 >
                                   {formatEditorialDate(article.created_at)}
                                 </time>
+                                {article.is_verified && <VerifiedBadge compact />}
                               </div>
                             </div>
                           </div>
@@ -809,13 +955,46 @@ export function ActualidadFeed({
                           <p className="mt-2.5 line-clamp-3 reading-prose-compact text-[var(--text-secondary)]">
                             {article.content}
                           </p>
-                          <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] tabular-nums">
-                            <Clock size={13} aria-hidden="true" />
-                            <span>
-                              {estimateReadMinutes(article.content)} min de lectura
+                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-[var(--text-muted)] tabular-nums">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock size={13} aria-hidden="true" />
+                              <span>
+                                {estimateReadMinutes(article.content)} min de lectura
+                              </span>
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <Eye size={13} aria-hidden="true" />
+                              <span>{article.views_count}</span>
                             </span>
                           </div>
                         </button>
+
+                        {(article.source_name || article.source_url) && (
+                          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                            <span className="font-medium">Fuente:</span>
+                            {article.source_url ? (
+                              <a
+                                href={article.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 font-semibold text-[var(--accent-primary)] hover:underline truncate max-w-[210px]"
+                              >
+                                <span className="truncate">
+                                  {article.source_name ||
+                                    new URL(article.source_url).hostname.replace(
+                                      /^www\./,
+                                      ''
+                                    )}
+                                </span>
+                                <ExternalLink size={12} className="shrink-0" aria-hidden="true" />
+                              </a>
+                            ) : (
+                              <span className="font-semibold text-[var(--text-secondary)] truncate">
+                                {article.source_name}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -891,6 +1070,31 @@ export function ActualidadFeed({
                         </div>
 
                         <div className="flex items-center gap-0.5">
+                          {canVerifyNews && (
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleVerified(article)}
+                              disabled={Boolean(verifyingIds[article.id])}
+                              title={
+                                article.is_verified
+                                  ? 'Quitar sello de Noticia Verificada'
+                                  : 'Marcar como Noticia Verificada'
+                              }
+                              aria-label={
+                                article.is_verified
+                                  ? 'Quitar verificación'
+                                  : 'Verificar noticia'
+                              }
+                              className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                                article.is_verified
+                                  ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25'
+                                  : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-emerald-500'
+                              }`}
+                            >
+                              <BadgeCheck size={16} aria-hidden="true" />
+                            </button>
+                          )}
+
                           {isOwner && (
                             <button
                               type="button"
@@ -943,6 +1147,27 @@ export function ActualidadFeed({
                               <Trash2 size={15} aria-hidden="true" />
                             </button>
                           )}
+
+                          {user?.id !== article.author_id && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReport(article)}
+                              disabled={reportedPostIds.has(article.id)}
+                              title={
+                                reportedPostIds.has(article.id)
+                                  ? 'Ya reportaste esta publicación'
+                                  : 'Reportar noticia falsa o inapropiada'
+                              }
+                              aria-label="Reportar artículo"
+                              className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+                                reportedPostIds.has(article.id)
+                                  ? 'text-rose-400/70 cursor-default'
+                                  : 'text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-400'
+                              }`}
+                            >
+                              <Flag size={14} aria-hidden="true" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -985,6 +1210,17 @@ export function ActualidadFeed({
         post={editingPost}
         onClose={() => setEditingPost(null)}
         onSaved={handleEditedSaved}
+      />
+
+      <ReportPostModal
+        isOpen={Boolean(reportingPost)}
+        postId={reportingPost?.id ?? null}
+        postTitle={reportingPost?.title || reportingPost?.content.slice(0, 80)}
+        reporterId={user?.id ?? null}
+        onClose={() => setReportingPost(null)}
+        onSubmitted={(postId) =>
+          setReportedPostIds((prev) => new Set(prev).add(postId))
+        }
       />
     </section>
   );

@@ -19,6 +19,7 @@ import {
   type SeriesRecord,
 } from '../lib/library';
 import { isSafeHttpUrl } from '../lib/supabase';
+import { CommentSection } from './CommentSection';
 
 interface ChapterReaderViewProps {
   series: SeriesRecord;
@@ -26,6 +27,7 @@ interface ChapterReaderViewProps {
   chapterIndex: number;
   onChangeChapterIndex: (nextIndex: number) => void;
   onBackToSeries: () => void;
+  onOpenAuth: () => void;
 }
 
 const NOVEL_FONT_SIZE_CLASSES: Record<number, string> = {
@@ -126,6 +128,7 @@ export function ChapterReaderView({
   chapterIndex,
   onChangeChapterIndex,
   onBackToSeries,
+  onOpenAuth,
 }: ChapterReaderViewProps) {
   const { themeMode, fontSizePx } = useTheme();
   const currentChapter = chapters[chapterIndex];
@@ -365,6 +368,17 @@ export function ChapterReaderView({
               </button>
             </div>
           </nav>
+
+          {/* Comentarios específicos de este capítulo */}
+          <div className="mt-10 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-base)] px-4 pb-6 text-[var(--text-main)] sm:px-6 transition-colors duration-300">
+            <CommentSection
+              key={currentChapter.id}
+              chapterId={currentChapter.id}
+              heading={`Comentarios · ${chapterLabel}`}
+              placeholder="Comparte tu reacción o teoría sobre este capítulo…"
+              onOpenAuth={onOpenAuth}
+            />
+          </div>
         </main>
       </div>
     );
@@ -473,6 +487,17 @@ export function ChapterReaderView({
             >
               Volver a {series.title}
             </button>
+          </div>
+
+          {/* Comentarios específicos de este capítulo */}
+          <div className="mt-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-base)] px-4 pb-6 text-[var(--text-main)] sm:px-6 transition-colors duration-300">
+            <CommentSection
+              key={currentChapter.id}
+              chapterId={currentChapter.id}
+              heading={`Comentarios · ${chapterLabel}`}
+              placeholder="Comparte tu reacción o teoría sobre este episodio…"
+              onOpenAuth={onOpenAuth}
+            />
           </div>
         </div>
       </footer>
